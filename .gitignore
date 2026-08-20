@@ -9,6 +9,10 @@
 .env.local
 .env.*.local
 
+# documentos reais da imobiliária (dados sensíveis, não versionar)
+/DOCUMENTOS IMOBILIÁRIA/
+/DOCUMENTOS IMOBILIÁRIA.zip
+
 # misc
 .DS_Store
 *.pem

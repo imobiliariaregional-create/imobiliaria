@@ -8,6 +8,7 @@ const links = [
   { href: "/pessoas", label: "Inquilinos/Compradores" },
   { href: "/contratos", label: "Contratos" },
   { href: "/pagamentos", label: "Pagamentos" },
+  { href: "/prestacao-contas", label: "Prestação de Contas" },
   { href: "/contas-consumo", label: "Água/Energia" },
   { href: "/notas-fiscais", label: "Notas Fiscais" },
 ];

@@ -16,6 +16,7 @@ import { ContratosListPage } from "@/pages/contratos/List";
 import { NovoContratoPage } from "@/pages/contratos/New";
 import { ContratoDetailPage } from "@/pages/contratos/Detail";
 import { PagamentosListPage } from "@/pages/pagamentos/List";
+import { PrestacaoContasListPage } from "@/pages/prestacaoContas/List";
 import { ContasConsumoListPage } from "@/pages/contasConsumo/List";
 import { NotasFiscaisListPage } from "@/pages/notasFiscais/List";
 import { NovaNotaFiscalPage } from "@/pages/notasFiscais/New";
@@ -54,6 +55,7 @@ export function App() {
             <Route path="/contratos/:id" element={<ContratoDetailPage />} />
 
             <Route path="/pagamentos" element={<PagamentosListPage />} />
+            <Route path="/prestacao-contas" element={<PrestacaoContasListPage />} />
             <Route path="/contas-consumo" element={<ContasConsumoListPage />} />
 
             <Route path="/notas-fiscais" element={<NotasFiscaisListPage />} />

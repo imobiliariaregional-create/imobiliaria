@@ -73,6 +73,8 @@ export interface PagamentoMensal {
   data_vencimento: string;
   data_pagamento: string | null;
   status: StatusPagamento;
+  valor_repassado: number | null;
+  data_repasse: string | null;
   created_at: string;
   contratos?: Contrato | null;
 }
