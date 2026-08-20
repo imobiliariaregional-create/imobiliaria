@@ -2,6 +2,8 @@
 
 Sistema interno de controle para a imobiliária: imóveis, proprietários, inquilinos/compradores, contratos (aluguel, administração e venda), pagamentos mensais recebidos pela imobiliária, contas de água/energia, laudos de vistoria e notas fiscais.
 
+**Arquitetura:** SPA (React + Vite) 100% client-side, hospedada como site estático no GitHub Pages. Não há servidor — o navegador fala diretamente com o Supabase (banco, autenticação e arquivos), e a segurança dos dados é garantida pelas políticas de RLS do Postgres.
+
 ## Como funciona a parte financeira
 
 - **Aluguel simples**: a imobiliária recebe só a taxa do primeiro aluguel. Ao criar o contrato, é gerado **um único** pagamento no valor informado.
@@ -15,7 +17,7 @@ Todos esses valores aparecem na tela **Pagamentos**, que serve como o controle d
 1. Acesse [supabase.com](https://supabase.com) e crie um novo projeto (grátis).
 2. Em **SQL Editor**, cole e execute o conteúdo de [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql). Isso cria todas as tabelas, as permissões (RLS) e os buckets de arquivos (`laudos-vistoria` e `notas-fiscais`).
 3. Em **Authentication → Users**, clique em **Add user** para criar o login de cada funcionário (e-mail + senha). Não há tela de cadastro pública — o acesso é só para quem a equipe cadastrar aqui.
-4. Em **Project Settings → API**, copie a **Project URL** e a **anon public key**.
+4. Em **Project Settings → API**, copie a **Project URL** e a **anon public key** (nunca a `service_role`/secret key — essa não é usada neste projeto e não deve ficar em nenhum arquivo do repositório).
 
 ## 2. Configurar o projeto localmente
 
@@ -27,8 +29,8 @@ cp .env.example .env.local
 Edite `.env.local` com a URL e a chave anon do seu projeto Supabase:
 
 ```
-NEXT_PUBLIC_SUPABASE_URL=https://SEU-PROJETO.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=sua-chave-anon-publica
+VITE_SUPABASE_URL=https://SEU-PROJETO.supabase.co
+VITE_SUPABASE_ANON_KEY=sua-chave-anon-publica
 ```
 
 Rodar localmente:
@@ -37,34 +39,34 @@ Rodar localmente:
 npm run dev
 ```
 
-Acesse `http://localhost:3000` e faça login com o usuário criado no passo 1.3.
+## 3. Publicar no GitHub Pages
 
-## 3. Publicar no GitHub
+O repositório já vem com um workflow (`.github/workflows/deploy.yml`) que builda e publica automaticamente a cada push na branch `main`.
 
-```bash
-git init
-git add .
-git commit -m "Sistema inicial de gestão da imobiliária"
-git branch -M main
-git remote add origin https://github.com/SEU-USUARIO/SEU-REPOSITORIO.git
-git push -u origin main
-```
+1. No repositório do GitHub, vá em **Settings → Pages** e em "Build and deployment" selecione **Source: GitHub Actions**.
+2. Ainda no GitHub, vá em **Settings → Secrets and variables → Actions** e crie dois *repository secrets*:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
 
-**Atenção:** o arquivo `.env.local` nunca é enviado ao GitHub (está no `.gitignore`). As chaves do Supabase ficam configuradas apenas no deploy (Vercel) e localmente.
+   (os mesmos valores do seu `.env.local`)
+3. Dê push na branch `main` — o Actions builda o projeto e publica em `https://SEU-USUARIO.github.io/imobiliaria/`.
 
-## 4. Deploy (recomendado: Vercel)
+Se o nome do repositório não for `imobiliaria`, ajuste a constante `REPO_NAME` em [`vite.config.ts`](vite.config.ts) para bater com o nome real do repositório (o GitHub Pages serve o site nesse subcaminho).
 
-1. Acesse [vercel.com](https://vercel.com), crie um projeto importando o repositório do GitHub.
-2. Em **Environment Variables**, adicione `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` com os mesmos valores do `.env.local`.
-3. Deploy. Pronto — o sistema fica acessível por uma URL pública, protegido por login.
+## Segurança
+
+- Como é uma SPA sem servidor, a sessão de login fica no navegador (padrão do Supabase Auth via `localStorage`), e não em cookie protegido por servidor. Isso é normal para esse tipo de site, mas significa que quem tiver acesso ao navegador/computador logado tem acesso à sessão.
+- Todo o controle de acesso real está nas políticas de **Row Level Security** do Supabase — qualquer usuário autenticado tem acesso de leitura/escrita nas tabelas; usuários não autenticados não veem nada.
+- A `anon key` é pública por natureza (fica visível no código do site) — isso é esperado e seguro *desde que* o RLS esteja ativo em todas as tabelas, como já está no `0001_init.sql`.
 
 ## Estrutura
 
-- `app/(app)/` — telas internas (dashboard, imóveis, proprietários, pessoas, contratos, pagamentos, contas de consumo, notas fiscais), todas atrás do login.
-- `app/login/` — tela de login.
-- `lib/supabase/` — clients Supabase (browser, server, middleware de sessão).
-- `lib/pagamentos.ts` — regra de geração automática dos pagamentos mensais/únicos por tipo de contrato.
+- `src/pages/` — todas as telas (dashboard, imóveis, proprietários, pessoas, contratos, pagamentos, contas de consumo, notas fiscais) e login.
+- `src/lib/supabase.ts` — client do Supabase usado no navegador.
+- `src/lib/auth.tsx` — contexto de sessão e rota protegida.
+- `src/lib/pagamentos.ts` — regra de geração automática dos pagamentos mensais/únicos por tipo de contrato.
 - `supabase/migrations/0001_init.sql` — schema completo do banco.
+- `.github/workflows/deploy.yml` — build e publicação automática no GitHub Pages.
 
 ## Próximos passos possíveis (fora do escopo desta versão)
 

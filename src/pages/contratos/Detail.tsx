@@ -1,0 +1,328 @@
+import { FormEvent, useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { supabase } from "@/lib/supabase";
+import { PageHeader, Card, Button, Field, Select, Input, Badge, Textarea, LoadingState } from "@/components/ui";
+import { ContratoForm, type ContratoPayload } from "@/components/ContratoForm";
+import { formatBRL, formatDate, formatMonth, todayISO, addMonthsISO } from "@/lib/format";
+import type { Contrato, Imovel, Pessoa, PagamentoMensal, LaudoVistoria, NotaFiscal } from "@/lib/types";
+
+const tipoLabel: Record<string, string> = {
+  aluguel: "Aluguel",
+  administracao: "Administração",
+  venda: "Venda",
+};
+
+export function ContratoDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+
+  const [contrato, setContrato] = useState<Contrato | null | undefined>(undefined);
+  const [pagamentos, setPagamentos] = useState<PagamentoMensal[]>([]);
+  const [laudos, setLaudos] = useState<LaudoVistoria[]>([]);
+  const [notas, setNotas] = useState<NotaFiscal[]>([]);
+  const [pessoas, setPessoas] = useState<Pessoa[]>([]);
+  const [laudoUrls, setLaudoUrls] = useState<Record<string, string>>({});
+  const [notaUrls, setNotaUrls] = useState<Record<string, string>>({});
+
+  async function reload() {
+    const [contratoRes, pagamentosRes, laudosRes, notasRes, pessoasRes] = await Promise.all([
+      supabase.from("contratos").select("*, imoveis(*)").eq("id", id).single<Contrato>(),
+      supabase
+        .from("pagamentos_mensais")
+        .select("*")
+        .eq("contrato_id", id)
+        .order("mes_referencia", { ascending: true })
+        .returns<PagamentoMensal[]>(),
+      supabase
+        .from("laudos_vistoria")
+        .select("*")
+        .eq("contrato_id", id)
+        .order("data", { ascending: false })
+        .returns<LaudoVistoria[]>(),
+      supabase
+        .from("notas_fiscais")
+        .select("*")
+        .eq("contrato_id", id)
+        .order("data_emissao", { ascending: false })
+        .returns<NotaFiscal[]>(),
+      supabase.from("pessoas").select("*").order("nome").returns<Pessoa[]>(),
+    ]);
+    setContrato(contratoRes.data);
+    setPagamentos(pagamentosRes.data ?? []);
+    setLaudos(laudosRes.data ?? []);
+    setNotas(notasRes.data ?? []);
+    setPessoas(pessoasRes.data ?? []);
+  }
+
+  useEffect(() => {
+    reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  useEffect(() => {
+    laudos.forEach((l) => {
+      if (l.arquivo_url && !laudoUrls[l.id]) {
+        supabase.storage
+          .from("laudos-vistoria")
+          .createSignedUrl(l.arquivo_url, 60 * 5)
+          .then(({ data }) => {
+            if (data) setLaudoUrls((prev) => ({ ...prev, [l.id]: data.signedUrl }));
+          });
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [laudos]);
+
+  useEffect(() => {
+    notas.forEach((n) => {
+      if (n.arquivo_url && !notaUrls[n.id]) {
+        supabase.storage
+          .from("notas-fiscais")
+          .createSignedUrl(n.arquivo_url, 60 * 5)
+          .then(({ data }) => {
+            if (data) setNotaUrls((prev) => ({ ...prev, [n.id]: data.signedUrl }));
+          });
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notas]);
+
+  async function handleUpdate(data: ContratoPayload) {
+    const { error } = await supabase.from("contratos").update(data).eq("id", id);
+    if (error) throw new Error(error.message);
+    await reload();
+  }
+
+  async function handleDelete() {
+    if (!contrato) return;
+    const { error } = await supabase.from("contratos").delete().eq("id", id);
+    if (error) throw new Error(error.message);
+    navigate(`/imoveis/${contrato.imovel_id}`);
+  }
+
+  async function togglePagamento(p: PagamentoMensal) {
+    const pago = p.status === "pago";
+    const { error } = await supabase
+      .from("pagamentos_mensais")
+      .update({ status: pago ? "pendente" : "pago", data_pagamento: pago ? null : todayISO() })
+      .eq("id", p.id);
+    if (error) {
+      alert(error.message);
+      return;
+    }
+    reload();
+  }
+
+  async function gerarProximoPagamento() {
+    if (!contrato) return;
+    const ultimo = pagamentos[pagamentos.length - 1];
+    const proximoMes = ultimo ? addMonthsISO(ultimo.mes_referencia, 1) : contrato.data_inicio.slice(0, 7) + "-01";
+    const valorMensal = Number(contrato.valor_aluguel ?? 0) * 0.1;
+
+    const [year, month] = proximoMes.split("-").map(Number);
+    const dia = contrato.dia_pagamento ?? 5;
+    const ultimoDiaDoMes = new Date(year, month, 0).getDate();
+    const dataVencimento = `${year}-${String(month).padStart(2, "0")}-${String(Math.min(dia, ultimoDiaDoMes)).padStart(2, "0")}`;
+
+    const { error } = await supabase.from("pagamentos_mensais").insert({
+      contrato_id: id,
+      mes_referencia: proximoMes,
+      valor: valorMensal,
+      data_vencimento: dataVencimento,
+      status: "pendente",
+    });
+    if (error) {
+      alert(error.message);
+      return;
+    }
+    reload();
+  }
+
+  async function handleCriarLaudo(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const tipo = String(formData.get("tipo"));
+    const data = String(formData.get("data"));
+    const observacoes = (formData.get("observacoes") as string) || null;
+    const arquivo = formData.get("arquivo") as File | null;
+
+    let arquivo_url: string | null = null;
+    if (arquivo && arquivo.size > 0) {
+      const nomeArquivo = `${id}/${Date.now()}-${arquivo.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from("laudos-vistoria")
+        .upload(nomeArquivo, arquivo, { contentType: arquivo.type });
+      if (uploadError) {
+        alert(uploadError.message);
+        return;
+      }
+      arquivo_url = nomeArquivo;
+    }
+
+    const { error } = await supabase.from("laudos_vistoria").insert({
+      contrato_id: id,
+      tipo,
+      data,
+      observacoes,
+      arquivo_url,
+    });
+    if (error) {
+      alert(error.message);
+      return;
+    }
+    e.currentTarget.reset();
+    reload();
+  }
+
+  async function excluirLaudo(laudo: LaudoVistoria) {
+    if (laudo.arquivo_url) {
+      await supabase.storage.from("laudos-vistoria").remove([laudo.arquivo_url]);
+    }
+    const { error } = await supabase.from("laudos_vistoria").delete().eq("id", laudo.id);
+    if (error) {
+      alert(error.message);
+      return;
+    }
+    reload();
+  }
+
+  if (contrato === undefined) return <LoadingState />;
+  if (contrato === null) return <p className="text-sm text-slate-500">Contrato não encontrado.</p>;
+
+  const imovel = contrato.imoveis as Imovel;
+  const hoje = todayISO();
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <PageHeader title={`Contrato de ${tipoLabel[contrato.tipo]} — ${imovel?.rua}, ${imovel?.numero}`} />
+        <ContratoForm
+          onSubmit={handleUpdate}
+          mode="edit"
+          imoveis={[imovel]}
+          pessoas={pessoas}
+          defaultValues={contrato}
+        />
+        <div className="max-w-2xl mt-4">
+          <Button type="button" variant="danger" onClick={handleDelete}>Excluir contrato</Button>
+        </div>
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-medium text-slate-900">Pagamentos à imobiliária</h2>
+          {contrato.tipo === "administracao" && (
+            <Button type="button" variant="secondary" onClick={gerarProximoPagamento}>Gerar próximo mês</Button>
+          )}
+        </div>
+        <Card>
+          {pagamentos.length > 0 ? (
+            <ul className="divide-y divide-slate-100">
+              {pagamentos.map((p) => {
+                const atrasado = p.status === "pendente" && p.data_vencimento < hoje;
+                return (
+                  <li key={p.id} className="px-4 py-3 flex items-center justify-between text-sm">
+                    <div>
+                      <span className="font-medium">{formatMonth(p.mes_referencia.slice(0, 7))}</span>
+                      <span className="text-slate-500"> · {formatBRL(p.valor)} · vencimento {formatDate(p.data_vencimento)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge color={p.status === "pago" ? "green" : atrasado ? "red" : "yellow"}>
+                        {p.status === "pago" ? "pago" : atrasado ? "atrasado" : "pendente"}
+                      </Badge>
+                      <Button type="button" variant="secondary" onClick={() => togglePagamento(p)}>
+                        {p.status === "pago" ? "Marcar pendente" : "Marcar pago"}
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <div className="text-center text-slate-500 py-8 text-sm">Nenhum pagamento gerado.</div>
+          )}
+        </Card>
+      </div>
+
+      <div>
+        <h2 className="font-medium text-slate-900 mb-3">Laudos de vistoria</h2>
+        <Card className="p-4">
+          <form onSubmit={handleCriarLaudo} className="grid grid-cols-2 gap-3 mb-4">
+            <Field label="Tipo" htmlFor="tipo_laudo">
+              <Select id="tipo_laudo" name="tipo">
+                <option value="entrada">Entrada</option>
+                <option value="renovacao">Renovação contratual</option>
+              </Select>
+            </Field>
+            <Field label="Data" htmlFor="data_laudo">
+              <Input id="data_laudo" name="data" type="date" required defaultValue={hoje} />
+            </Field>
+            <div className="col-span-2">
+              <Field label="Observações" htmlFor="observacoes_laudo">
+                <Textarea id="observacoes_laudo" name="observacoes" rows={2} />
+              </Field>
+            </div>
+            <div className="col-span-2">
+              <Field label="Arquivo (PDF/imagem, opcional)" htmlFor="arquivo_laudo">
+                <input type="file" id="arquivo_laudo" name="arquivo" accept=".pdf,image/*" className="text-sm" />
+              </Field>
+            </div>
+            <div className="col-span-2">
+              <Button type="submit">Adicionar laudo</Button>
+            </div>
+          </form>
+
+          {laudos.length > 0 ? (
+            <ul className="divide-y divide-slate-100">
+              {laudos.map((l) => (
+                <li key={l.id} className="py-2 flex items-center justify-between text-sm">
+                  <div>
+                    <Badge color="blue">{l.tipo === "entrada" ? "Entrada" : "Renovação"}</Badge>
+                    <span className="ml-2 text-slate-700">{formatDate(l.data)}</span>
+                    {laudoUrls[l.id] && (
+                      <a href={laudoUrls[l.id]} target="_blank" rel="noreferrer" className="ml-2 text-brand-700 hover:underline">
+                        ver arquivo
+                      </a>
+                    )}
+                  </div>
+                  <Button type="button" variant="danger" onClick={() => excluirLaudo(l)}>Excluir</Button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-slate-500">Nenhum laudo cadastrado ainda.</p>
+          )}
+        </Card>
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-medium text-slate-900">Notas fiscais vinculadas</h2>
+          <Link to={`/notas-fiscais/nova?contrato_id=${id}`} className="text-sm text-brand-700 hover:underline">
+            + Nova nota fiscal
+          </Link>
+        </div>
+        <Card>
+          {notas.length > 0 ? (
+            <ul className="divide-y divide-slate-100">
+              {notas.map((n) => (
+                <li key={n.id} className="px-4 py-3 flex items-center justify-between text-sm">
+                  <span>
+                    {n.numero ?? "s/n"} · {formatBRL(n.valor)} · {formatDate(n.data_emissao)}
+                  </span>
+                  {notaUrls[n.id] && (
+                    <a href={notaUrls[n.id]} target="_blank" rel="noreferrer" className="text-brand-700 hover:underline">
+                      ver arquivo
+                    </a>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="text-center text-slate-500 py-8 text-sm">Nenhuma nota fiscal vinculada.</div>
+          )}
+        </Card>
+      </div>
+    </div>
+  );
+}
