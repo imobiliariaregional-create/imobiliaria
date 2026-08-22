@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
-import { PageHeader, Card, Field, Select, Button, LoadingState, ErrorState } from "@/components/ui";
+import { PageHeader, Card, Field, Select, Button, Badge, LoadingState, ErrorState } from "@/components/ui";
 import { ClausulasEditor } from "@/components/ClausulasEditor";
 import { DocumentoContratoView } from "@/components/DocumentoContratoView";
 import { resolverPlaceholders, substituirPlaceholders } from "@/lib/placeholders";
 import { imovelLabel } from "@/lib/imovelLabel";
 import { fetchLetterheadDataUrl } from "@/lib/letterhead";
-import { exportContratoPDF, exportContratoDocx } from "@/lib/exportContrato";
+import { exportContratoPDF, exportContratoDocx, gerarContratoPdfBase64 } from "@/lib/exportContrato";
+import { enviarParaAssinatura, consultarStatusAssinatura, baixarDocumentoAssinado, STATUS_LABEL } from "@/lib/assinafy";
 import type { ClausulaDocumento, Contrato, ContratoGerado, ModeloContrato } from "@/lib/types";
 
 export function ContratoDocumentoPage() {
@@ -21,6 +22,7 @@ export function ContratoDocumentoPage() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exportando, setExportando] = useState<"pdf" | "docx" | null>(null);
+  const [assinaturaPending, setAssinaturaPending] = useState(false);
 
   async function reload() {
     setError(null);
@@ -123,6 +125,80 @@ export function ContratoDocumentoPage() {
     }
   }
 
+  async function enviarAssinatura() {
+    if (!gerado || !contrato) return;
+    setAssinaturaPending(true);
+    setError(null);
+    try {
+      const proprietario = contrato.imoveis?.proprietarios;
+      const pessoa = contrato.pessoas;
+      if (!proprietario?.email) throw new Error("O proprietário não tem e-mail cadastrado.");
+      if (!pessoa) throw new Error("Este contrato não tem inquilino/comprador vinculado.");
+      if (!pessoa.email) throw new Error("O inquilino/comprador não tem e-mail cadastrado.");
+
+      const letterheadDataUrl = await fetchLetterheadDataUrl();
+      const pdfBase64 = gerarContratoPdfBase64(clausulas, { letterheadDataUrl });
+      const fileName = `contrato${contrato.numero_contrato ? "-" + contrato.numero_contrato.replace("/", "-") : ""}.pdf`;
+
+      const resultado = await enviarParaAssinatura(pdfBase64, fileName, [
+        { nome: proprietario.nome, email: proprietario.email },
+        { nome: pessoa.nome, email: pessoa.email },
+      ]);
+
+      const { data, error } = await supabase
+        .from("contratos_gerados")
+        .update({
+          assinafy_document_id: resultado.documentId,
+          assinafy_assignment_id: resultado.assignmentId,
+          assinafy_status: resultado.status,
+        })
+        .eq("id", gerado.id)
+        .select("*")
+        .single<ContratoGerado>();
+      if (error) throw new Error(error.message);
+      setGerado(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao enviar para assinatura.");
+    } finally {
+      setAssinaturaPending(false);
+    }
+  }
+
+  async function atualizarStatusAssinatura() {
+    if (!gerado?.assinafy_document_id) return;
+    setAssinaturaPending(true);
+    setError(null);
+    try {
+      const status = await consultarStatusAssinatura(gerado.assinafy_document_id);
+      const { data, error } = await supabase
+        .from("contratos_gerados")
+        .update({ assinafy_status: status.status, assinafy_resumo: status.resumo })
+        .eq("id", gerado.id)
+        .select("*")
+        .single<ContratoGerado>();
+      if (error) throw new Error(error.message);
+      setGerado(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao consultar status.");
+    } finally {
+      setAssinaturaPending(false);
+    }
+  }
+
+  async function baixarAssinado() {
+    if (!gerado?.assinafy_document_id) return;
+    setAssinaturaPending(true);
+    setError(null);
+    try {
+      const fileName = `contrato${contrato?.numero_contrato ? "-" + contrato.numero_contrato.replace("/", "-") : ""}-assinado.pdf`;
+      await baixarDocumentoAssinado(gerado.assinafy_document_id, "certificated", fileName);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao baixar documento assinado.");
+    } finally {
+      setAssinaturaPending(false);
+    }
+  }
+
   if (contrato === undefined || gerado === undefined) return <LoadingState />;
   if (contrato === null) return <p className="text-sm text-slate-500">Contrato não encontrado.</p>;
 
@@ -171,6 +247,43 @@ export function ContratoDocumentoPage() {
             </Button>
           </div>
           {error && <ErrorState message={error} />}
+
+          <Card className="p-5 print:hidden">
+            <h2 className="font-medium text-slate-900 mb-3">Assinatura digital</h2>
+            {!gerado.assinafy_document_id ? (
+              <div className="space-y-2">
+                <p className="text-sm text-slate-500">
+                  Envia este PDF para o proprietário e o inquilino/comprador assinarem digitalmente (via Assinafy).
+                </p>
+                <Button type="button" onClick={enviarAssinatura} disabled={assinaturaPending}>
+                  {assinaturaPending ? "Enviando..." : "Enviar para assinatura"}
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between text-sm">
+                <div>
+                  <Badge color={gerado.assinafy_status === "certificated" ? "green" : "yellow"}>
+                    {STATUS_LABEL[gerado.assinafy_status ?? ""] ?? gerado.assinafy_status}
+                  </Badge>
+                  {gerado.assinafy_resumo && (
+                    <span className="ml-2 text-slate-500">
+                      {gerado.assinafy_resumo.completed_count} de {gerado.assinafy_resumo.signer_count} assinaram
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button type="button" variant="secondary" onClick={atualizarStatusAssinatura} disabled={assinaturaPending}>
+                    {assinaturaPending ? "Atualizando..." : "Atualizar status"}
+                  </Button>
+                  {gerado.assinafy_status === "certificated" && (
+                    <Button type="button" variant="secondary" onClick={baixarAssinado} disabled={assinaturaPending}>
+                      Baixar assinado
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+          </Card>
 
           <div className="print:hidden">
             <p className="text-sm font-medium text-slate-700 mb-2">Editar cláusulas</p>

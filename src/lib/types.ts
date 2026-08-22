@@ -158,4 +158,8 @@ export interface ContratoGerado {
   modelo_id: string | null;
   clausulas: ClausulaDocumento[];
   created_at: string;
+  assinafy_document_id: string | null;
+  assinafy_assignment_id: string | null;
+  assinafy_status: string | null;
+  assinafy_resumo: { signer_count: number; completed_count: number } | null;
 }

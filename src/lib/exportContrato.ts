@@ -55,10 +55,10 @@ function desenharLinhaJustificada(doc: jsPDF, linha: string, x: number, y: numbe
   });
 }
 
-export function exportContratoPDF(
+function criarDocumentoPDF(
   clausulas: ClausulaDocumento[],
-  opts: { numeroContrato?: string | null; letterheadDataUrl?: string | null }
-) {
+  opts: { letterheadDataUrl?: string | null }
+): jsPDF {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -113,7 +113,25 @@ export function exportContratoPDF(
     y += lineHeight * 0.6;
   }
 
+  return doc;
+}
+
+export function exportContratoPDF(
+  clausulas: ClausulaDocumento[],
+  opts: { numeroContrato?: string | null; letterheadDataUrl?: string | null }
+) {
+  const doc = criarDocumentoPDF(clausulas, opts);
   doc.save(nomeArquivo(opts.numeroContrato, "pdf"));
+}
+
+/** Gera o mesmo PDF em base64 (sem disparar download) — usado para enviar para assinatura digital. */
+export function gerarContratoPdfBase64(
+  clausulas: ClausulaDocumento[],
+  opts: { letterheadDataUrl?: string | null }
+): string {
+  const doc = criarDocumentoPDF(clausulas, opts);
+  const dataUri = doc.output("datauristring");
+  return dataUri.slice(dataUri.indexOf(",") + 1);
 }
 
 async function letterheadImageRun(letterheadDataUrl: string): Promise<ImageRun> {
