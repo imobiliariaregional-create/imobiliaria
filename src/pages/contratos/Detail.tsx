@@ -3,7 +3,8 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { PageHeader, Card, Button, Field, Select, Input, Badge, Textarea, LoadingState } from "@/components/ui";
 import { ContratoForm, type ContratoPayload } from "@/components/ContratoForm";
-import { formatBRL, formatDate, formatMonth, todayISO, addMonthsISO } from "@/lib/format";
+import { formatBRL, formatDate, formatMonth, todayISO, addMonthsISO, addDaysISO, diffDiasISO } from "@/lib/format";
+import { imovelLabel, mapaContratosAtivosPorImovel } from "@/lib/imovelLabel";
 import type { Contrato, Imovel, Pessoa, PagamentoMensal, LaudoVistoria, NotaFiscal } from "@/lib/types";
 
 const tipoLabel: Record<string, string> = {
@@ -26,7 +27,7 @@ export function ContratoDetailPage() {
 
   async function reload() {
     const [contratoRes, pagamentosRes, laudosRes, notasRes, pessoasRes] = await Promise.all([
-      supabase.from("contratos").select("*, imoveis(*)").eq("id", id).single<Contrato>(),
+      supabase.from("contratos").select("*, imoveis(*), pessoas(*)").eq("id", id).single<Contrato>(),
       supabase
         .from("pagamentos_mensais")
         .select("*")
@@ -88,9 +89,22 @@ export function ContratoDetailPage() {
   }, [notas]);
 
   async function handleUpdate(data: ContratoPayload) {
-    const { error } = await supabase.from("contratos").update(data).eq("id", id);
+    const payload: Record<string, unknown> = { ...data };
+    if (data.periodo_visita_dias && !contrato?.data_ultima_visita) {
+      payload.data_ultima_visita = todayISO();
+    }
+    const { error } = await supabase.from("contratos").update(payload).eq("id", id);
     if (error) throw new Error(error.message);
     await reload();
+  }
+
+  async function marcarVisitaRealizada() {
+    const { error } = await supabase.from("contratos").update({ data_ultima_visita: todayISO() }).eq("id", id);
+    if (error) {
+      alert(error.message);
+      return;
+    }
+    reload();
   }
 
   async function handleDelete() {
@@ -191,22 +205,55 @@ export function ContratoDetailPage() {
 
   const imovel = contrato.imoveis as Imovel;
   const hoje = todayISO();
+  const contratosAtivosPorImovel =
+    contrato.status === "ativo" ? new Map([[imovel.id, contrato]]) : new Map<string, Contrato>();
+  const proximaVisita =
+    contrato.periodo_visita_dias && contrato.data_ultima_visita
+      ? addDaysISO(contrato.data_ultima_visita, contrato.periodo_visita_dias)
+      : null;
 
   return (
     <div className="space-y-8">
       <div>
-        <PageHeader title={`Contrato de ${tipoLabel[contrato.tipo]} — ${imovel?.rua}, ${imovel?.numero}`} />
+        <PageHeader
+          title={`Contrato ${contrato.numero_contrato ? contrato.numero_contrato + " — " : ""}${tipoLabel[contrato.tipo]} — ${imovelLabel(imovel, contrato)}`}
+          action={{ href: `/contratos/${id}/documento`, label: "Documento do contrato" }}
+        />
         <ContratoForm
           onSubmit={handleUpdate}
           mode="edit"
           imoveis={[imovel]}
           pessoas={pessoas}
           defaultValues={contrato}
+          contratosAtivosPorImovel={contratosAtivosPorImovel}
         />
         <div className="max-w-2xl mt-4">
           <Button type="button" variant="danger" onClick={handleDelete}>Excluir contrato</Button>
         </div>
       </div>
+
+      {contrato.periodo_visita_dias && (
+        <div>
+          <h2 className="font-medium text-slate-900 mb-3">Visitas periódicas</h2>
+          <Card className="p-4 text-sm text-slate-700 flex items-center justify-between">
+            <div>
+              <p>Período configurado: a cada {contrato.periodo_visita_dias} dias</p>
+              <p>Última visita: {formatDate(contrato.data_ultima_visita)}</p>
+              {proximaVisita && (
+                <p>
+                  Próxima visita: {formatDate(proximaVisita)}{" "}
+                  {diffDiasISO(proximaVisita, hoje) <= 2 && (
+                    <Badge color={diffDiasISO(proximaVisita, hoje) < 0 ? "red" : "yellow"}>
+                      {diffDiasISO(proximaVisita, hoje) < 0 ? "atrasada" : "avisar inquilino"}
+                    </Badge>
+                  )}
+                </p>
+              )}
+            </div>
+            <Button type="button" variant="secondary" onClick={marcarVisitaRealizada}>Marcar visita realizada</Button>
+          </Card>
+        </div>
+      )}
 
       <div>
         <div className="flex items-center justify-between mb-3">
@@ -252,6 +299,7 @@ export function ContratoDetailPage() {
               <Select id="tipo_laudo" name="tipo">
                 <option value="entrada">Entrada</option>
                 <option value="renovacao">Renovação contratual</option>
+                <option value="saida">Saída</option>
               </Select>
             </Field>
             <Field label="Data" htmlFor="data_laudo">
@@ -277,7 +325,7 @@ export function ContratoDetailPage() {
               {laudos.map((l) => (
                 <li key={l.id} className="py-2 flex items-center justify-between text-sm">
                   <div>
-                    <Badge color="blue">{l.tipo === "entrada" ? "Entrada" : "Renovação"}</Badge>
+                    <Badge color="blue">{l.tipo === "entrada" ? "Entrada" : l.tipo === "saida" ? "Saída" : "Renovação"}</Badge>
                     <span className="ml-2 text-slate-700">{formatDate(l.data)}</span>
                     {laudoUrls[l.id] && (
                       <a href={laudoUrls[l.id]} target="_blank" rel="noreferrer" className="ml-2 text-brand-700 hover:underline">

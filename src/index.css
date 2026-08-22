@@ -5,3 +5,19 @@
 html {
   background-color: #f8fafc;
 }
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #documento-contrato,
+  #documento-contrato * {
+    visibility: visible;
+  }
+  #documento-contrato {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+}

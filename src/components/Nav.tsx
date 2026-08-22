@@ -7,6 +7,7 @@ const links = [
   { href: "/proprietarios", label: "Proprietários" },
   { href: "/pessoas", label: "Inquilinos/Compradores" },
   { href: "/contratos", label: "Contratos" },
+  { href: "/modelos-contrato", label: "Modelos de Contrato" },
   { href: "/pagamentos", label: "Pagamentos" },
   { href: "/prestacao-contas", label: "Prestação de Contas" },
   { href: "/contas-consumo", label: "Água/Energia" },

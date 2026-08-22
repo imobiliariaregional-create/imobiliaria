@@ -33,6 +33,7 @@ export function ContratosListPage() {
           <Table>
             <thead>
               <tr>
+                <Th>Número</Th>
                 <Th>Imóvel</Th>
                 <Th>Pessoa</Th>
                 <Th>Tipo</Th>
@@ -43,6 +44,7 @@ export function ContratosListPage() {
             <tbody>
               {data.map((c) => (
                 <tr key={c.id} className="hover:bg-slate-50">
+                  <Td>{c.numero_contrato ?? "-"}</Td>
                   <Td>
                     <Link to={`/contratos/${c.id}`} className="text-brand-700 hover:underline font-medium">
                       {c.imoveis?.rua}, {c.imoveis?.numero}

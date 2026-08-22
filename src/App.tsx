@@ -15,6 +15,10 @@ import { ImovelDetailPage } from "@/pages/imoveis/Detail";
 import { ContratosListPage } from "@/pages/contratos/List";
 import { NovoContratoPage } from "@/pages/contratos/New";
 import { ContratoDetailPage } from "@/pages/contratos/Detail";
+import { ContratoDocumentoPage } from "@/pages/contratos/Documento";
+import { ModelosContratoListPage } from "@/pages/modelosContrato/List";
+import { NovoModeloContratoPage } from "@/pages/modelosContrato/New";
+import { EditarModeloContratoPage } from "@/pages/modelosContrato/Edit";
 import { PagamentosListPage } from "@/pages/pagamentos/List";
 import { PrestacaoContasListPage } from "@/pages/prestacaoContas/List";
 import { ContasConsumoListPage } from "@/pages/contasConsumo/List";
@@ -53,6 +57,11 @@ export function App() {
             <Route path="/contratos" element={<ContratosListPage />} />
             <Route path="/contratos/novo" element={<NovoContratoPage />} />
             <Route path="/contratos/:id" element={<ContratoDetailPage />} />
+            <Route path="/contratos/:id/documento" element={<ContratoDocumentoPage />} />
+
+            <Route path="/modelos-contrato" element={<ModelosContratoListPage />} />
+            <Route path="/modelos-contrato/novo" element={<NovoModeloContratoPage />} />
+            <Route path="/modelos-contrato/:id" element={<EditarModeloContratoPage />} />
 
             <Route path="/pagamentos" element={<PagamentosListPage />} />
             <Route path="/prestacao-contas" element={<PrestacaoContasListPage />} />

@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader, Card, Button, Field, Select, Input, Badge, LoadingState } from "@/components/ui";
 import { ImovelForm, type ImovelPayload } from "@/components/ImovelForm";
 import { formatMonth, formatDate, todayISO } from "@/lib/format";
+import { imovelLabel, enderecoImovel } from "@/lib/imovelLabel";
 import type { Imovel, Proprietario, Contrato, ContaConsumo } from "@/lib/types";
 
 export function ImovelDetailPage() {
@@ -102,13 +103,16 @@ export function ImovelDetailPage() {
   if (imovel === undefined) return <LoadingState />;
   if (imovel === null) return <p className="text-sm text-slate-500">Imóvel não encontrado.</p>;
 
+  const contratoAtivo = contratos.find((c) => c.status === "ativo") ?? null;
+
   return (
     <div className="space-y-8">
       <div>
         <PageHeader
-          title={`${imovel.rua}, ${imovel.numero ?? ""}`}
+          title={imovelLabel(imovel, contratoAtivo)}
           action={{ href: `/contratos/novo?imovel_id=${imovel.id}`, label: "Novo contrato" }}
         />
+        {contratoAtivo && <p className="text-sm text-slate-500 -mt-4 mb-4">{enderecoImovel(imovel)}</p>}
         <ImovelForm onSubmit={handleUpdate} defaultValues={imovel} proprietarios={proprietarios} />
         <div className="max-w-2xl mt-4">
           <Button type="button" variant="danger" onClick={handleDelete}>Excluir imóvel</Button>

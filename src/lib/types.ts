@@ -4,8 +4,11 @@ export type StatusContrato = "ativo" | "encerrado" | "renovado";
 export type StatusPagamento = "pago" | "pendente" | "atrasado";
 export type TipoConsumo = "agua" | "energia";
 export type StatusConsumo = "pago" | "pendente";
-export type TipoLaudo = "entrada" | "renovacao";
+export type TipoLaudo = "entrada" | "renovacao" | "saida";
 export type FormaComissaoVenda = "percentual" | "fixo";
+export type TipoPessoa = "fisica" | "juridica";
+export type TipoContaBancaria = "corrente" | "poupanca";
+export type TipoImovel = "residencial" | "comercial";
 
 export interface Proprietario {
   id: string;
@@ -15,6 +18,16 @@ export interface Proprietario {
   email: string | null;
   chave_pix: string | null;
   observacoes: string | null;
+  endereco: string | null;
+  rg: string | null;
+  banco: string | null;
+  agencia: string | null;
+  conta: string | null;
+  tipo_conta: TipoContaBancaria | null;
+  tipo_pessoa: TipoPessoa;
+  representante_nome: string | null;
+  representante_cpf: string | null;
+  representante_rg: string | null;
   created_at: string;
 }
 
@@ -24,6 +37,12 @@ export interface Pessoa {
   cpf_cnpj: string | null;
   telefone: string | null;
   email: string | null;
+  rg: string | null;
+  endereco: string | null;
+  tipo_pessoa: TipoPessoa;
+  representante_nome: string | null;
+  representante_cpf: string | null;
+  representante_rg: string | null;
   created_at: string;
 }
 
@@ -37,6 +56,8 @@ export interface Imovel {
   uf: string | null;
   cep: string | null;
   tipo_operacao: TipoOperacao;
+  tipo_imovel: TipoImovel;
+  descricao: string | null;
   controla_agua: boolean;
   controla_energia: boolean;
   status: StatusImovel;
@@ -50,10 +71,14 @@ export interface Contrato {
   imovel_id: string;
   pessoa_id: string | null;
   tipo: TipoOperacao;
+  numero_contrato: string | null;
   valor_aluguel: number | null;
   dia_pagamento: number | null;
   data_inicio: string;
+  duracao_meses: number | null;
   vigencia_final: string | null;
+  periodo_visita_dias: number | null;
+  data_ultima_visita: string | null;
   forma_comissao_venda: FormaComissaoVenda | null;
   percentual_comissao: number | null;
   valor_comissao_fixo: number | null;
@@ -111,4 +136,26 @@ export interface NotaFiscal {
   contrato_id: string | null;
   created_at: string;
   contratos?: Contrato | null;
+}
+
+export interface ClausulaDocumento {
+  id: string;
+  titulo: string | null;
+  texto: string;
+}
+
+export interface ModeloContrato {
+  id: string;
+  nome: string;
+  tipo_operacao: TipoOperacao;
+  clausulas: ClausulaDocumento[];
+  created_at: string;
+}
+
+export interface ContratoGerado {
+  id: string;
+  contrato_id: string;
+  modelo_id: string | null;
+  clausulas: ClausulaDocumento[];
+  created_at: string;
 }

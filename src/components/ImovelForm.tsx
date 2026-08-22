@@ -31,6 +31,8 @@ export function ImovelForm({
         uf: (formData.get("uf") as string) || null,
         cep: (formData.get("cep") as string) || null,
         tipo_operacao: String(formData.get("tipo_operacao") ?? "aluguel") as Imovel["tipo_operacao"],
+        tipo_imovel: String(formData.get("tipo_imovel") ?? "residencial") as Imovel["tipo_imovel"],
+        descricao: (formData.get("descricao") as string) || null,
         controla_agua: formData.get("controla_agua") === "on",
         controla_energia: formData.get("controla_energia") === "on",
         status: String(formData.get("status") ?? "disponivel") as Imovel["status"],
@@ -83,12 +85,18 @@ export function ImovelForm({
           <Input id="cep" name="cep" defaultValue={defaultValues?.cep ?? ""} />
         </Field>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <Field label="Tipo de operação" htmlFor="tipo_operacao">
             <Select id="tipo_operacao" name="tipo_operacao" defaultValue={defaultValues?.tipo_operacao ?? "aluguel"}>
               <option value="aluguel">Aluguel (taxa única)</option>
               <option value="administracao">Administração (10% mensal)</option>
               <option value="venda">Venda</option>
+            </Select>
+          </Field>
+          <Field label="Tipo de imóvel" htmlFor="tipo_imovel">
+            <Select id="tipo_imovel" name="tipo_imovel" defaultValue={defaultValues?.tipo_imovel ?? "residencial"}>
+              <option value="residencial">Residencial</option>
+              <option value="comercial">Comercial</option>
             </Select>
           </Field>
           <Field label="Status" htmlFor="status">
@@ -99,6 +107,16 @@ export function ImovelForm({
             </Select>
           </Field>
         </div>
+
+        <Field label="Descrição do imóvel (para contratos)" htmlFor="descricao">
+          <Textarea
+            id="descricao"
+            name="descricao"
+            rows={3}
+            placeholder="Características do imóvel: cômodos, área, mobília, etc. Esse texto pode ser usado no modelo de contrato através do código #descricao_imovel."
+            defaultValue={defaultValues?.descricao ?? ""}
+          />
+        </Field>
 
         <div>
           <Label>Contas de consumo controladas neste imóvel</Label>

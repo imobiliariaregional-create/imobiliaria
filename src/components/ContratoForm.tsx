@@ -1,6 +1,7 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { Card, Field, Input, Select, Textarea, Button, Label, ErrorState } from "@/components/ui";
-import { todayISO } from "@/lib/format";
+import { todayISO, addMonthsISO, formatBRL } from "@/lib/format";
+import { imovelLabel } from "@/lib/imovelLabel";
 import type { Contrato, Imovel, Pessoa } from "@/lib/types";
 
 const tipoLabel: Record<string, string> = {
@@ -9,7 +10,11 @@ const tipoLabel: Record<string, string> = {
   venda: "Venda",
 };
 
-export type ContratoPayload = Omit<Contrato, "id" | "created_at" | "imoveis" | "pessoas">;
+/** numero_contrato e data_ultima_visita são gerados/controlados pela página, não pelo formulário. */
+export type ContratoPayload = Omit<
+  Contrato,
+  "id" | "created_at" | "imoveis" | "pessoas" | "numero_contrato" | "data_ultima_visita"
+>;
 
 export function ContratoForm({
   onSubmit,
@@ -17,6 +22,7 @@ export function ContratoForm({
   imoveis,
   pessoas,
   imovelFixo,
+  contratosAtivosPorImovel,
   defaultValues,
 }: {
   onSubmit: (data: ContratoPayload) => Promise<void>;
@@ -24,17 +30,27 @@ export function ContratoForm({
   imoveis: Imovel[];
   pessoas: Pessoa[];
   imovelFixo?: Imovel;
+  contratosAtivosPorImovel?: Map<string, Contrato>;
   defaultValues?: Partial<Contrato>;
 }) {
   const imovelInicial = imovelFixo ?? imoveis.find((i) => i.id === defaultValues?.imovel_id) ?? imoveis[0];
   const [imovelId, setImovelId] = useState(imovelInicial?.id ?? "");
   const [formaComissao, setFormaComissao] = useState(defaultValues?.forma_comissao_venda ?? "percentual");
+  const [valorAluguel, setValorAluguel] = useState(defaultValues?.valor_aluguel ?? "");
+  const [duracaoMeses, setDuracaoMeses] = useState(defaultValues?.duracao_meses ?? "");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const imovelSelecionado = imoveis.find((i) => i.id === imovelId) ?? imovelFixo;
   const tipo = mode === "edit" ? defaultValues?.tipo : imovelSelecionado?.tipo_operacao;
   const bloqueado = mode === "edit";
+
+  const valorTotalEstimado = useMemo(() => {
+    const v = Number(valorAluguel);
+    const m = Number(duracaoMeses);
+    if (!v || !m || tipo === "venda") return null;
+    return v * m;
+  }, [valorAluguel, duracaoMeses, tipo]);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -48,6 +64,9 @@ export function ContratoForm({
       return Number(v);
     }
 
+    const dataInicio = String(formData.get("data_inicio"));
+    const duracao = tipo !== "venda" ? num("duracao_meses") : null;
+
     try {
       await onSubmit({
         imovel_id: String(formData.get("imovel_id")),
@@ -55,8 +74,10 @@ export function ContratoForm({
         tipo: tipo as Contrato["tipo"],
         valor_aluguel: tipo !== "venda" ? num("valor_aluguel") : null,
         dia_pagamento: tipo !== "venda" ? num("dia_pagamento") : null,
-        data_inicio: String(formData.get("data_inicio")),
-        vigencia_final: (formData.get("vigencia_final") as string) || null,
+        data_inicio: dataInicio,
+        duracao_meses: duracao,
+        vigencia_final: duracao ? addMonthsISO(dataInicio, duracao) : null,
+        periodo_visita_dias: tipo !== "venda" ? num("periodo_visita_dias") : null,
         forma_comissao_venda: tipo === "venda" ? (String(formData.get("forma_comissao_venda")) as Contrato["forma_comissao_venda"]) : null,
         percentual_comissao: tipo === "venda" ? num("percentual_comissao") : null,
         valor_comissao_fixo: tipo === "venda" ? num("valor_comissao_fixo") : null,
@@ -79,7 +100,7 @@ export function ContratoForm({
           {bloqueado || imovelFixo ? (
             <>
               <p className="text-sm text-slate-700 py-2">
-                {(imovelFixo ?? imovelSelecionado)?.rua}, {(imovelFixo ?? imovelSelecionado)?.numero} — {tipoLabel[tipo ?? ""]}
+                {imovelLabel(imovelFixo ?? imovelSelecionado!, contratosAtivosPorImovel?.get((imovelFixo ?? imovelSelecionado)!.id))} — {tipoLabel[tipo ?? ""]}
               </p>
               <input type="hidden" name="imovel_id" value={imovelFixo?.id ?? defaultValues?.imovel_id ?? ""} />
             </>
@@ -93,7 +114,7 @@ export function ContratoForm({
             >
               {imoveis.map((i) => (
                 <option key={i.id} value={i.id}>
-                  {i.rua}, {i.numero} — {tipoLabel[i.tipo_operacao]}
+                  {imovelLabel(i, contratosAtivosPorImovel?.get(i.id))} — {tipoLabel[i.tipo_operacao]}
                 </option>
               ))}
             </Select>
@@ -133,6 +154,7 @@ export function ContratoForm({
                   min="0"
                   required
                   defaultValue={defaultValues?.valor_aluguel ?? ""}
+                  onChange={(e) => setValorAluguel(e.target.value)}
                 />
               </Field>
               <Field label="Dia de pagamento" htmlFor="dia_pagamento">
@@ -152,14 +174,34 @@ export function ContratoForm({
                 A imobiliária recebe 10% desse valor todo mês, gerado automaticamente até a vigência final.
               </p>
             )}
-            <Field label="Vigência final do contrato" htmlFor="vigencia_final">
+            <Field label="Duração (meses)" htmlFor="duracao_meses">
               <Input
-                id="vigencia_final"
-                name="vigencia_final"
-                type="date"
+                id="duracao_meses"
+                name="duracao_meses"
+                type="number"
+                min={1}
                 required
-                defaultValue={defaultValues?.vigencia_final ?? ""}
+                defaultValue={defaultValues?.duracao_meses ?? ""}
+                onChange={(e) => setDuracaoMeses(e.target.value)}
               />
+            </Field>
+            {valorTotalEstimado !== null && (
+              <p className="text-xs text-slate-500 -mt-2">
+                Valor total estimado do contrato: <span className="font-medium">{formatBRL(valorTotalEstimado)}</span>
+              </p>
+            )}
+            <Field label="Período entre visitas ao imóvel (dias, opcional)" htmlFor="periodo_visita_dias">
+              <Input
+                id="periodo_visita_dias"
+                name="periodo_visita_dias"
+                type="number"
+                min={1}
+                placeholder="ex: 90"
+                defaultValue={defaultValues?.periodo_visita_dias ?? ""}
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                O dashboard vai avisar com 48h de antecedência quando a próxima visita estiver perto.
+              </p>
             </Field>
           </>
         )}
