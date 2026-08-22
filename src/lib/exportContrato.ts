@@ -35,6 +35,26 @@ function nomeArquivo(numeroContrato: string | null | undefined, extensao: string
   return `${base}.${extensao}`;
 }
 
+/** Justifica manualmente distribuindo o espaço extra entre as palavras (o align:"justify" nativo do jsPDF não é confiável). */
+function desenharLinhaJustificada(doc: jsPDF, linha: string, x: number, y: number, larguraAlvo: number) {
+  const palavras = linha.split(" ").filter((p) => p.length > 0);
+  if (palavras.length <= 1) {
+    doc.text(linha, x, y);
+    return;
+  }
+  const larguraPalavras = palavras.reduce((soma, p) => soma + doc.getTextWidth(p), 0);
+  const espacoNormal = doc.getTextWidth(" ");
+  const larguraNatural = larguraPalavras + espacoNormal * (palavras.length - 1);
+  const espacoExtra = Math.max(0, larguraAlvo - larguraNatural);
+  const espacoPorGap = espacoNormal + espacoExtra / (palavras.length - 1);
+
+  let cursorX = x;
+  palavras.forEach((palavra, idx) => {
+    doc.text(palavra, cursorX, y);
+    cursorX += doc.getTextWidth(palavra) + espacoPorGap;
+  });
+}
+
 export function exportContratoPDF(
   clausulas: ClausulaDocumento[],
   opts: { numeroContrato?: string | null; letterheadDataUrl?: string | null }
@@ -85,7 +105,7 @@ export function exportContratoPDF(
         if (ultimaLinha) {
           doc.text(linha, MARGIN_LEFT_MM, y);
         } else {
-          doc.text(linha, MARGIN_LEFT_MM, y, { maxWidth: contentWidth, align: "justify" });
+          desenharLinhaJustificada(doc, linha, MARGIN_LEFT_MM, y, contentWidth);
         }
         y += lineHeight;
       });
