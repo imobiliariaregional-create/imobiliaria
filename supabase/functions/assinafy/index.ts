@@ -50,7 +50,12 @@ async function getAccountId(): Promise<string> {
   return cachedAccountId;
 }
 
-async function criarSigner(accountId: string, fullName: string, email: string) {
+/** Reaproveita o signatário se já existir com esse e-mail (Assinafy não permite e-mail duplicado). */
+async function obterOuCriarSigner(accountId: string, fullName: string, email: string) {
+  const existentes = await assinafyFetch(`/accounts/${accountId}/signers?search=${encodeURIComponent(email)}`);
+  const existente = (existentes ?? []).find((s: { email?: string }) => s.email?.toLowerCase() === email.toLowerCase());
+  if (existente) return existente;
+
   return assinafyFetch(`/accounts/${accountId}/signers`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -68,7 +73,7 @@ async function enviarParaAssinatura(payload: {
 
   const signerIds: string[] = [];
   for (const s of payload.signatarios) {
-    const signer = await criarSigner(accountId, s.nome, s.email);
+    const signer = await obterOuCriarSigner(accountId, s.nome, s.email);
     signerIds.push(signer.id);
   }
 

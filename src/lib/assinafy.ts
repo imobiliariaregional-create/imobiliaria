@@ -15,7 +15,18 @@ interface StatusResultado {
 
 async function invocar<T>(body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke("assinafy", { body });
-  if (error) throw new Error(error.message);
+  if (error) {
+    const resposta = "context" in error ? (error as { context?: Response }).context : undefined;
+    if (resposta) {
+      try {
+        const corpo = await resposta.clone().json();
+        throw new Error(corpo.error || error.message);
+      } catch {
+        // corpo não era JSON; segue com a mensagem genérica
+      }
+    }
+    throw new Error(error.message);
+  }
   if (data?.error) throw new Error(data.error);
   return data as T;
 }
