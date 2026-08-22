@@ -20,6 +20,9 @@ export function ContratoDocumentoPage() {
   const [error, setError] = useState<string | null>(null);
 
   async function reload() {
+    setError(null);
+    setContrato(undefined);
+    setGerado(undefined);
     const [contratoRes, geradoRes] = await Promise.all([
       supabase.from("contratos").select("*, imoveis(*, proprietarios(*)), pessoas(*)").eq("id", id).single<Contrato>(),
       supabase.from("contratos_gerados").select("*").eq("contrato_id", id).maybeSingle<ContratoGerado>(),
