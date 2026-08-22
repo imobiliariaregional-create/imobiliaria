@@ -6,6 +6,8 @@ import { ClausulasEditor } from "@/components/ClausulasEditor";
 import { DocumentoContratoView } from "@/components/DocumentoContratoView";
 import { resolverPlaceholders, substituirPlaceholders } from "@/lib/placeholders";
 import { imovelLabel } from "@/lib/imovelLabel";
+import { fetchLetterheadDataUrl } from "@/lib/letterhead";
+import { exportContratoPDF, exportContratoDocx } from "@/lib/exportContrato";
 import type { ClausulaDocumento, Contrato, ContratoGerado, ModeloContrato } from "@/lib/types";
 
 export function ContratoDocumentoPage() {
@@ -18,6 +20,7 @@ export function ContratoDocumentoPage() {
   const [clausulas, setClausulas] = useState<ClausulaDocumento[]>([]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [exportando, setExportando] = useState<"pdf" | "docx" | null>(null);
 
   async function reload() {
     setError(null);
@@ -94,6 +97,32 @@ export function ContratoDocumentoPage() {
     if (error) setError(error.message);
   }
 
+  async function exportarPDF() {
+    setExportando("pdf");
+    setError(null);
+    try {
+      const letterheadDataUrl = await fetchLetterheadDataUrl();
+      exportContratoPDF(clausulas, { numeroContrato: contrato?.numero_contrato, letterheadDataUrl });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao exportar PDF.");
+    } finally {
+      setExportando(null);
+    }
+  }
+
+  async function exportarWord() {
+    setExportando("docx");
+    setError(null);
+    try {
+      const letterheadDataUrl = await fetchLetterheadDataUrl();
+      await exportContratoDocx(clausulas, { numeroContrato: contrato?.numero_contrato, letterheadDataUrl });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao exportar Word.");
+    } finally {
+      setExportando(null);
+    }
+  }
+
   if (contrato === undefined || gerado === undefined) return <LoadingState />;
   if (contrato === null) return <p className="text-sm text-slate-500">Contrato não encontrado.</p>;
 
@@ -133,6 +162,12 @@ export function ContratoDocumentoPage() {
             </Button>
             <Button type="button" variant="secondary" onClick={() => window.print()}>
               Imprimir
+            </Button>
+            <Button type="button" variant="secondary" onClick={exportarPDF} disabled={exportando !== null}>
+              {exportando === "pdf" ? "Exportando..." : "Exportar PDF"}
+            </Button>
+            <Button type="button" variant="secondary" onClick={exportarWord} disabled={exportando !== null}>
+              {exportando === "docx" ? "Exportando..." : "Exportar Word"}
             </Button>
           </div>
           {error && <ErrorState message={error} />}

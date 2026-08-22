@@ -54,12 +54,22 @@ export function resolverPlaceholders({ contrato, imovel, proprietario, pessoa }:
   v.agencia_proprietario = proprietario.agencia ?? "";
   v.conta_proprietario = proprietario.conta ?? "";
   v.tipo_conta_proprietario = proprietario.tipo_conta ?? "";
+  v.dados_bancarios_proprietario = [
+    proprietario.banco ? `Banco: ${proprietario.banco}` : null,
+    proprietario.agencia ? `Agência: ${proprietario.agencia}` : null,
+    proprietario.conta ? `Conta ${proprietario.tipo_conta === "poupanca" ? "poupança" : "corrente"}: ${proprietario.conta}` : null,
+    proprietario.chave_pix ? `PIX: ${proprietario.chave_pix}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   for (const alias of ["locador", "vendedor"]) {
     v[`nome_${alias}`] = v.nome_proprietario;
     v[`cpf_${alias}`] = v.cpf_cnpj_proprietario;
     v[`rg_${alias}`] = v.rg_proprietario;
     v[`endereco_${alias}`] = v.endereco_proprietario;
+    v[`telefone_${alias}`] = v.telefone_proprietario;
+    v[`email_${alias}`] = v.email_proprietario;
   }
 
   // ===== Inquilino/Comprador =====
@@ -79,6 +89,8 @@ export function resolverPlaceholders({ contrato, imovel, proprietario, pessoa }:
     v[`cpf_${alias}`] = v.cpf_cnpj_pessoa;
     v[`rg_${alias}`] = v.rg_pessoa;
     v[`endereco_${alias}`] = v.endereco_pessoa;
+    v[`telefone_${alias}`] = v.telefone_pessoa;
+    v[`email_${alias}`] = v.email_pessoa;
   }
 
   // ===== Imóvel =====
@@ -159,6 +171,7 @@ export const PLACEHOLDERS: PlaceholderInfo[] = [
   { codigo: "#agencia_proprietario", descricao: "Agência bancária do proprietário", categoria: "Proprietário" },
   { codigo: "#conta_proprietario", descricao: "Conta bancária do proprietário", categoria: "Proprietário" },
   { codigo: "#tipo_conta_proprietario", descricao: "Tipo de conta (corrente/poupança)", categoria: "Proprietário" },
+  { codigo: "#dados_bancarios_proprietario", descricao: "Banco, agência, conta e PIX do proprietário, já formatados numa linha", categoria: "Proprietário" },
 
   { codigo: "#nome_pessoa", descricao: "Nome/razão social do inquilino ou comprador (aliases: #nome_locatario, #nome_comprador)", categoria: "Inquilino/Comprador" },
   { codigo: "#cpf_cnpj_pessoa", descricao: "CPF/CNPJ (aliases: #cpf_locatario, #cpf_comprador)", categoria: "Inquilino/Comprador" },

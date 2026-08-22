@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { PageHeader, Card, Table, Th, Td, EmptyState, Badge, LoadingState } from "@/components/ui";
+import { PapelTimbradoCard } from "@/components/PapelTimbradoCard";
 import type { ModeloContrato } from "@/lib/types";
 
 const tipoLabel: Record<string, string> = {
@@ -25,6 +26,7 @@ export function ModelosContratoListPage() {
   return (
     <div>
       <PageHeader title="Modelos de Contrato" action={{ href: "/modelos-contrato/novo", label: "Novo modelo" }} />
+      <PapelTimbradoCard />
       <Card>
         {data === null ? (
           <LoadingState />
