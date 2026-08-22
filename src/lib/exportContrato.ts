@@ -6,6 +6,7 @@ import {
   TextRun,
   ImageRun,
   Header,
+  AlignmentType,
   HorizontalPositionAlign,
   VerticalPositionAlign,
   HorizontalPositionRelativeFrom,
@@ -17,6 +18,17 @@ import type { ClausulaDocumento } from "@/lib/types";
 
 const PAGE_W_PX = 794; // A4 a 96dpi
 const PAGE_H_PX = 1123;
+
+// Margens padrão (petição/contrato): superior e esquerda 3cm, inferior e direita 2cm.
+const MARGIN_TOP_MM = 30;
+const MARGIN_LEFT_MM = 30;
+const MARGIN_BOTTOM_MM = 20;
+const MARGIN_RIGHT_MM = 20;
+const MM_PER_TWIP = 25.4 / 1440;
+const MARGIN_TOP_TWIP = Math.round(MARGIN_TOP_MM / MM_PER_TWIP);
+const MARGIN_LEFT_TWIP = Math.round(MARGIN_LEFT_MM / MM_PER_TWIP);
+const MARGIN_BOTTOM_TWIP = Math.round(MARGIN_BOTTOM_MM / MM_PER_TWIP);
+const MARGIN_RIGHT_TWIP = Math.round(MARGIN_RIGHT_MM / MM_PER_TWIP);
 
 function nomeArquivo(numeroContrato: string | null | undefined, extensao: string) {
   const base = numeroContrato ? `contrato-${numeroContrato.replace("/", "-")}` : "contrato";
@@ -30,12 +42,9 @@ export function exportContratoPDF(
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const marginLeft = 25;
-  const marginRight = 25;
-  const marginTop = opts.letterheadDataUrl ? 45 : 20;
-  const marginBottom = opts.letterheadDataUrl ? 30 : 20;
-  const contentWidth = pageWidth - marginLeft - marginRight;
-  const lineHeight = 5.5;
+  const contentWidth = pageWidth - MARGIN_LEFT_MM - MARGIN_RIGHT_MM;
+  const fontSize = 10; // pt
+  const lineHeight = fontSize * 0.3528 * 1.5; // espaçamento 1,5
 
   function drawLetterhead() {
     if (opts.letterheadDataUrl) {
@@ -43,36 +52,45 @@ export function exportContratoPDF(
     }
   }
 
-  let y = marginTop;
+  let y = MARGIN_TOP_MM;
   drawLetterhead();
 
   function ensureSpace(neededHeight: number) {
-    if (y + neededHeight > pageHeight - marginBottom) {
+    if (y + neededHeight > pageHeight - MARGIN_BOTTOM_MM) {
       doc.addPage();
       drawLetterhead();
-      y = marginTop;
+      y = MARGIN_TOP_MM;
     }
   }
 
-  doc.setFontSize(10);
+  doc.setFontSize(fontSize);
   for (const clausula of clausulas) {
     if (clausula.titulo) {
-      ensureSpace(lineHeight * 2);
+      ensureSpace(lineHeight * 1.3);
       doc.setFont("helvetica", "bold");
-      doc.text(clausula.titulo, marginLeft, y);
-      y += lineHeight * 1.4;
+      doc.text(clausula.titulo, MARGIN_LEFT_MM, y);
+      y += lineHeight;
       doc.setFont("helvetica", "normal");
     }
-    const paragrafos = clausula.texto.split("\n");
-    for (const paragrafo of paragrafos) {
-      const linhas = doc.splitTextToSize(paragrafo, contentWidth);
-      for (const linha of linhas) {
+    for (const paragrafo of clausula.texto.split("\n")) {
+      if (paragrafo.trim() === "") {
         ensureSpace(lineHeight);
-        doc.text(linha, marginLeft, y);
         y += lineHeight;
+        continue;
       }
+      const linhas: string[] = doc.splitTextToSize(paragrafo, contentWidth);
+      linhas.forEach((linha, idx) => {
+        ensureSpace(lineHeight);
+        const ultimaLinha = idx === linhas.length - 1;
+        if (ultimaLinha) {
+          doc.text(linha, MARGIN_LEFT_MM, y);
+        } else {
+          doc.text(linha, MARGIN_LEFT_MM, y, { maxWidth: contentWidth, align: "justify" });
+        }
+        y += lineHeight;
+      });
     }
-    y += lineHeight;
+    y += lineHeight * 0.6;
   }
 
   doc.save(nomeArquivo(opts.numeroContrato, "pdf"));
@@ -95,6 +113,8 @@ async function letterheadImageRun(letterheadDataUrl: string): Promise<ImageRun> 
   });
 }
 
+const LINE_1_5 = { line: 360, lineRule: "auto" as const }; // 360/240 = 1,5
+
 export async function exportContratoDocx(
   clausulas: ClausulaDocumento[],
   opts: { numeroContrato?: string | null; letterheadDataUrl?: string | null }
@@ -103,10 +123,21 @@ export async function exportContratoDocx(
 
   for (const clausula of clausulas) {
     if (clausula.titulo) {
-      children.push(new Paragraph({ children: [new TextRun({ text: clausula.titulo, bold: true })], spacing: { before: 200, after: 100 } }));
+      children.push(
+        new Paragraph({
+          children: [new TextRun({ text: clausula.titulo, bold: true })],
+          spacing: { before: 200, after: 100, ...LINE_1_5 },
+        })
+      );
     }
     for (const paragrafo of clausula.texto.split("\n")) {
-      children.push(new Paragraph({ children: [new TextRun(paragrafo)], spacing: { after: 100 } }));
+      children.push(
+        new Paragraph({
+          children: [new TextRun(paragrafo)],
+          alignment: AlignmentType.JUSTIFIED,
+          spacing: { after: 100, ...LINE_1_5 },
+        })
+      );
     }
   }
 
@@ -120,9 +151,7 @@ export async function exportContratoDocx(
         headers: header ? { default: header } : undefined,
         properties: {
           page: {
-            margin: opts.letterheadDataUrl
-              ? { top: 2200, bottom: 1400, left: 1200, right: 1200 }
-              : { top: 1000, bottom: 1000, left: 1200, right: 1200 },
+            margin: { top: MARGIN_TOP_TWIP, bottom: MARGIN_BOTTOM_TWIP, left: MARGIN_LEFT_TWIP, right: MARGIN_RIGHT_TWIP },
           },
         },
         children,
