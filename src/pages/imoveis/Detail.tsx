@@ -6,8 +6,11 @@ import { ImovelForm, type ImovelPayload } from "@/components/ImovelForm";
 import { formatMonth, formatDate, todayISO } from "@/lib/format";
 import { imovelLabel, enderecoImovel } from "@/lib/imovelLabel";
 import type { Imovel, Proprietario, Contrato, ContaConsumo } from "@/lib/types";
+import { confirmDeletion } from "@/lib/actions";
+import { useAuth } from "@/lib/auth";
 
 export function ImovelDetailPage() {
+  const { papel } = useAuth();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
@@ -51,8 +54,15 @@ export function ImovelDetailPage() {
   }
 
   async function handleDelete() {
+    if (!confirmDeletion("Excluir este imóvel e todos os contratos, pagamentos e laudos vinculados?")) return;
+    const contratoIds = contratos.map((contrato) => contrato.id);
+    const { data: arquivos } = contratoIds.length > 0
+      ? await supabase.from("laudos_vistoria").select("arquivo_url").in("contrato_id", contratoIds).not("arquivo_url", "is", null)
+      : { data: [] as { arquivo_url: string | null }[] };
     const { error } = await supabase.from("imoveis").delete().eq("id", id);
     if (error) throw new Error(error.message);
+    const caminhos = (arquivos ?? []).flatMap((item) => item.arquivo_url ? [item.arquivo_url] : []);
+    if (caminhos.length > 0) await supabase.storage.from("laudos-vistoria").remove(caminhos);
     navigate("/imoveis");
   }
 
@@ -92,6 +102,7 @@ export function ImovelDetailPage() {
   }
 
   async function excluirConta(contaId: string) {
+    if (!confirmDeletion("Excluir esta conta de consumo?")) return;
     const { error } = await supabase.from("contas_consumo").delete().eq("id", contaId);
     if (error) {
       alert(error.message);
@@ -113,9 +124,13 @@ export function ImovelDetailPage() {
           action={{ href: `/contratos/novo?imovel_id=${imovel.id}`, label: "Novo contrato" }}
         />
         {contratoAtivo && <p className="text-sm text-slate-500 -mt-4 mb-4">{enderecoImovel(imovel)}</p>}
-        <ImovelForm onSubmit={handleUpdate} defaultValues={imovel} proprietarios={proprietarios} />
+        {(papel === "admin" || papel === "corretor") ? (
+          <ImovelForm onSubmit={handleUpdate} defaultValues={imovel} proprietarios={proprietarios} />
+        ) : (
+          <Card className="max-w-2xl p-4 text-sm text-slate-600">Seu perfil possui acesso somente de leitura aos dados do imóvel.</Card>
+        )}
         <div className="max-w-2xl mt-4">
-          <Button type="button" variant="danger" onClick={handleDelete}>Excluir imóvel</Button>
+          {papel === "admin" && <Button type="button" variant="danger" onClick={handleDelete}>Excluir imóvel</Button>}
         </div>
       </div>
 
@@ -148,7 +163,7 @@ export function ImovelDetailPage() {
         <div>
           <h2 className="font-medium text-slate-900 mb-3">Água / Energia</h2>
           <Card className="p-4">
-            <form onSubmit={handleCriarConta} className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+            {(papel === "admin" || papel === "financeiro") && <form onSubmit={handleCriarConta} className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end">
               <Field label="Tipo" htmlFor="tipo">
                 <Select id="tipo" name="tipo">
                   {imovel.controla_agua && <option value="agua">Água</option>}
@@ -159,7 +174,7 @@ export function ImovelDetailPage() {
                 <Input id="mes_referencia" name="mes_referencia" type="month" required />
               </Field>
               <Button type="submit">Adicionar</Button>
-            </form>
+            </form>}
 
             {contas.length > 0 ? (
               <ul className="divide-y divide-slate-100">
@@ -170,10 +185,12 @@ export function ImovelDetailPage() {
                     </span>
                     <div className="flex items-center gap-2">
                       <Badge color={c.status_pagamento === "pago" ? "green" : "yellow"}>{c.status_pagamento}</Badge>
-                      <Button type="button" variant="secondary" onClick={() => toggleConta(c)}>
-                        {c.status_pagamento === "pago" ? "Marcar pendente" : "Marcar pago"}
-                      </Button>
-                      <Button type="button" variant="danger" onClick={() => excluirConta(c.id)}>Excluir</Button>
+                      {(papel === "admin" || papel === "financeiro") && (
+                        <Button type="button" variant="secondary" onClick={() => toggleConta(c)}>
+                          {c.status_pagamento === "pago" ? "Marcar pendente" : "Marcar pago"}
+                        </Button>
+                      )}
+                      {(papel === "admin" || papel === "financeiro") && <Button type="button" variant="danger" onClick={() => excluirConta(c.id)}>Excluir</Button>}
                     </div>
                   </li>
                 ))}

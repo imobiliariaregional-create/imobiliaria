@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader, Card, Table, Th, Td, EmptyState, Badge, LoadingState } from "@/components/ui";
 import { imovelLabel, enderecoImovel, mapaContratosAtivosPorImovel } from "@/lib/imovelLabel";
 import type { Contrato, Imovel } from "@/lib/types";
+import { useAuth } from "@/lib/auth";
 
 const tipoLabel: Record<string, string> = {
   aluguel: "Aluguel",
@@ -18,6 +19,7 @@ const statusColor: Record<string, "green" | "blue" | "slate"> = {
 };
 
 export function ImoveisListPage() {
+  const { papel } = useAuth();
   const [data, setData] = useState<Imovel[] | null>(null);
   const [contratosAtivos, setContratosAtivos] = useState<Map<string, Contrato>>(new Map());
 
@@ -36,7 +38,7 @@ export function ImoveisListPage() {
 
   return (
     <div>
-      <PageHeader title="Imóveis" action={{ href: "/imoveis/novo", label: "Novo imóvel" }} />
+      <PageHeader title="Imóveis" action={papel === "admin" || papel === "corretor" ? { href: "/imoveis/novo", label: "Novo imóvel" } : undefined} />
       <Card>
         {data === null ? (
           <LoadingState />

@@ -3,8 +3,10 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { PageHeader, Card, Table, Th, Td, EmptyState, LoadingState } from "@/components/ui";
 import type { Pessoa } from "@/lib/types";
+import { useAuth } from "@/lib/auth";
 
 export function PessoasListPage() {
+  const { papel } = useAuth();
   const [data, setData] = useState<Pessoa[] | null>(null);
 
   useEffect(() => {
@@ -13,7 +15,7 @@ export function PessoasListPage() {
 
   return (
     <div>
-      <PageHeader title="Inquilinos/Compradores" action={{ href: "/pessoas/nova", label: "Nova pessoa" }} />
+      <PageHeader title="Inquilinos/Compradores" action={papel === "admin" || papel === "corretor" ? { href: "/pessoas/nova", label: "Nova pessoa" } : undefined} />
       <Card>
         {data === null ? (
           <LoadingState />

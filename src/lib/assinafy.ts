@@ -18,12 +18,13 @@ async function invocar<T>(body: Record<string, unknown>): Promise<T> {
   if (error) {
     const resposta = "context" in error ? (error as { context?: Response }).context : undefined;
     if (resposta) {
+      let corpo: { error?: string } | null = null;
       try {
-        const corpo = await resposta.clone().json();
-        throw new Error(corpo.error || error.message);
+        corpo = await resposta.clone().json();
       } catch {
         // corpo não era JSON; segue com a mensagem genérica
       }
+      if (corpo?.error) throw new Error(corpo.error);
     }
     throw new Error(error.message);
   }

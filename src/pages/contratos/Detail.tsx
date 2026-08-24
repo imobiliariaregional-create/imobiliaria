@@ -3,9 +3,11 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { PageHeader, Card, Button, Field, Select, Input, Badge, Textarea, LoadingState } from "@/components/ui";
 import { ContratoForm, type ContratoPayload } from "@/components/ContratoForm";
-import { formatBRL, formatDate, formatMonth, todayISO, addMonthsISO, addDaysISO, diffDiasISO } from "@/lib/format";
+import { formatBRL, formatDate, formatMonth, todayISO, addDaysISO, diffDiasISO } from "@/lib/format";
 import { imovelLabel, mapaContratosAtivosPorImovel } from "@/lib/imovelLabel";
 import type { Contrato, Imovel, Pessoa, PagamentoMensal, LaudoVistoria, NotaFiscal } from "@/lib/types";
+import { confirmDeletion } from "@/lib/actions";
+import { useAuth } from "@/lib/auth";
 
 const tipoLabel: Record<string, string> = {
   aluguel: "Aluguel",
@@ -14,6 +16,7 @@ const tipoLabel: Record<string, string> = {
 };
 
 export function ContratoDetailPage() {
+  const { papel } = useAuth();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
@@ -89,11 +92,7 @@ export function ContratoDetailPage() {
   }, [notas]);
 
   async function handleUpdate(data: ContratoPayload) {
-    const payload: Record<string, unknown> = { ...data };
-    if (data.periodo_visita_dias && !contrato?.data_ultima_visita) {
-      payload.data_ultima_visita = todayISO();
-    }
-    const { error } = await supabase.from("contratos").update(payload).eq("id", id);
+    const { error } = await supabase.rpc("atualizar_contrato_com_pagamentos", { p_id: id, p_payload: data });
     if (error) throw new Error(error.message);
     await reload();
   }
@@ -109,42 +108,24 @@ export function ContratoDetailPage() {
 
   async function handleDelete() {
     if (!contrato) return;
+    if (!confirmDeletion("Excluir este contrato, seus pagamentos, laudos e documento gerado?")) return;
+    const caminhos = laudos.flatMap((laudo) => laudo.arquivo_url ? [laudo.arquivo_url] : []);
     const { error } = await supabase.from("contratos").delete().eq("id", id);
     if (error) throw new Error(error.message);
+    if (caminhos.length > 0) await supabase.storage.from("laudos-vistoria").remove(caminhos);
     navigate(`/imoveis/${contrato.imovel_id}`);
   }
 
   async function togglePagamento(p: PagamentoMensal) {
     const pago = p.status === "pago";
+    if (pago && p.valor_repassado !== null) {
+      alert("Desfaça o repasse ao proprietário antes de marcar este pagamento como pendente.");
+      return;
+    }
     const { error } = await supabase
       .from("pagamentos_mensais")
       .update({ status: pago ? "pendente" : "pago", data_pagamento: pago ? null : todayISO() })
       .eq("id", p.id);
-    if (error) {
-      alert(error.message);
-      return;
-    }
-    reload();
-  }
-
-  async function gerarProximoPagamento() {
-    if (!contrato) return;
-    const ultimo = pagamentos[pagamentos.length - 1];
-    const proximoMes = ultimo ? addMonthsISO(ultimo.mes_referencia, 1) : contrato.data_inicio.slice(0, 7) + "-01";
-    const valorMensal = Number(contrato.valor_aluguel ?? 0) * 0.1;
-
-    const [year, month] = proximoMes.split("-").map(Number);
-    const dia = contrato.dia_pagamento ?? 5;
-    const ultimoDiaDoMes = new Date(year, month, 0).getDate();
-    const dataVencimento = `${year}-${String(month).padStart(2, "0")}-${String(Math.min(dia, ultimoDiaDoMes)).padStart(2, "0")}`;
-
-    const { error } = await supabase.from("pagamentos_mensais").insert({
-      contrato_id: id,
-      mes_referencia: proximoMes,
-      valor: valorMensal,
-      data_vencimento: dataVencimento,
-      status: "pendente",
-    });
     if (error) {
       alert(error.message);
       return;
@@ -181,6 +162,7 @@ export function ContratoDetailPage() {
       arquivo_url,
     });
     if (error) {
+      if (arquivo_url) await supabase.storage.from("laudos-vistoria").remove([arquivo_url]);
       alert(error.message);
       return;
     }
@@ -189,14 +171,13 @@ export function ContratoDetailPage() {
   }
 
   async function excluirLaudo(laudo: LaudoVistoria) {
-    if (laudo.arquivo_url) {
-      await supabase.storage.from("laudos-vistoria").remove([laudo.arquivo_url]);
-    }
+    if (!confirmDeletion("Excluir este laudo de vistoria?")) return;
     const { error } = await supabase.from("laudos_vistoria").delete().eq("id", laudo.id);
     if (error) {
       alert(error.message);
       return;
     }
+    if (laudo.arquivo_url) await supabase.storage.from("laudos-vistoria").remove([laudo.arquivo_url]);
     reload();
   }
 
@@ -219,16 +200,22 @@ export function ContratoDetailPage() {
           title={`Contrato ${contrato.numero_contrato ? contrato.numero_contrato + " — " : ""}${tipoLabel[contrato.tipo]} — ${imovelLabel(imovel, contrato)}`}
           action={{ href: `/contratos/${id}/documento`, label: "Documento do contrato" }}
         />
-        <ContratoForm
-          onSubmit={handleUpdate}
-          mode="edit"
-          imoveis={[imovel]}
-          pessoas={pessoas}
-          defaultValues={contrato}
-          contratosAtivosPorImovel={contratosAtivosPorImovel}
-        />
+        {(papel === "admin" || papel === "corretor") ? (
+          <ContratoForm
+            onSubmit={handleUpdate}
+            mode="edit"
+            imoveis={[imovel]}
+            pessoas={pessoas}
+            defaultValues={contrato}
+            contratosAtivosPorImovel={contratosAtivosPorImovel}
+          />
+        ) : (
+          <Card className="p-4 text-sm text-slate-600">
+            Seu perfil financeiro possui acesso somente para consulta aos dados do contrato.
+          </Card>
+        )}
         <div className="max-w-2xl mt-4">
-          <Button type="button" variant="danger" onClick={handleDelete}>Excluir contrato</Button>
+          {papel === "admin" && <Button type="button" variant="danger" onClick={handleDelete}>Excluir contrato</Button>}
         </div>
       </div>
 
@@ -250,7 +237,9 @@ export function ContratoDetailPage() {
                 </p>
               )}
             </div>
-            <Button type="button" variant="secondary" onClick={marcarVisitaRealizada}>Marcar visita realizada</Button>
+            {(papel === "admin" || papel === "corretor") && (
+              <Button type="button" variant="secondary" onClick={marcarVisitaRealizada}>Marcar visita realizada</Button>
+            )}
           </Card>
         </div>
       )}
@@ -258,9 +247,6 @@ export function ContratoDetailPage() {
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-medium text-slate-900">Pagamentos à imobiliária</h2>
-          {contrato.tipo === "administracao" && (
-            <Button type="button" variant="secondary" onClick={gerarProximoPagamento}>Gerar próximo mês</Button>
-          )}
         </div>
         <Card>
           {pagamentos.length > 0 ? (
@@ -277,9 +263,14 @@ export function ContratoDetailPage() {
                       <Badge color={p.status === "pago" ? "green" : atrasado ? "red" : "yellow"}>
                         {p.status === "pago" ? "pago" : atrasado ? "atrasado" : "pendente"}
                       </Badge>
-                      <Button type="button" variant="secondary" onClick={() => togglePagamento(p)}>
+                      {(papel === "admin" || papel === "financeiro") && <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={p.status === "pago" && p.valor_repassado !== null}
+                        onClick={() => togglePagamento(p)}
+                      >
                         {p.status === "pago" ? "Marcar pendente" : "Marcar pago"}
-                      </Button>
+                      </Button>}
                     </div>
                   </li>
                 );
@@ -294,31 +285,33 @@ export function ContratoDetailPage() {
       <div>
         <h2 className="font-medium text-slate-900 mb-3">Laudos de vistoria</h2>
         <Card className="p-4">
-          <form onSubmit={handleCriarLaudo} className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Field label="Tipo" htmlFor="tipo_laudo">
-              <Select id="tipo_laudo" name="tipo">
-                <option value="entrada">Entrada</option>
-                <option value="renovacao">Renovação contratual</option>
-                <option value="saida">Saída</option>
-              </Select>
-            </Field>
-            <Field label="Data" htmlFor="data_laudo">
-              <Input id="data_laudo" name="data" type="date" required defaultValue={hoje} />
-            </Field>
-            <div className="col-span-2">
-              <Field label="Observações" htmlFor="observacoes_laudo">
-                <Textarea id="observacoes_laudo" name="observacoes" rows={2} />
+          {(papel === "admin" || papel === "corretor") && (
+            <form onSubmit={handleCriarLaudo} className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field label="Tipo" htmlFor="tipo_laudo">
+                <Select id="tipo_laudo" name="tipo">
+                  <option value="entrada">Entrada</option>
+                  <option value="renovacao">Renovação contratual</option>
+                  <option value="saida">Saída</option>
+                </Select>
               </Field>
-            </div>
-            <div className="col-span-2">
-              <Field label="Arquivo (PDF/imagem, opcional)" htmlFor="arquivo_laudo">
-                <input type="file" id="arquivo_laudo" name="arquivo" accept=".pdf,image/*" className="text-sm" />
+              <Field label="Data" htmlFor="data_laudo">
+                <Input id="data_laudo" name="data" type="date" required defaultValue={hoje} />
               </Field>
-            </div>
-            <div className="col-span-2">
-              <Button type="submit">Adicionar laudo</Button>
-            </div>
-          </form>
+              <div className="col-span-2">
+                <Field label="Observações" htmlFor="observacoes_laudo">
+                  <Textarea id="observacoes_laudo" name="observacoes" rows={2} />
+                </Field>
+              </div>
+              <div className="col-span-2">
+                <Field label="Arquivo (PDF/imagem, opcional)" htmlFor="arquivo_laudo">
+                  <input type="file" id="arquivo_laudo" name="arquivo" accept=".pdf,image/*" className="text-sm" />
+                </Field>
+              </div>
+              <div className="col-span-2">
+                <Button type="submit">Adicionar laudo</Button>
+              </div>
+            </form>
+          )}
 
           {laudos.length > 0 ? (
             <ul className="divide-y divide-slate-100">
@@ -333,7 +326,7 @@ export function ContratoDetailPage() {
                       </a>
                     )}
                   </div>
-                  <Button type="button" variant="danger" onClick={() => excluirLaudo(l)}>Excluir</Button>
+                  {(papel === "admin" || papel === "corretor") && <Button type="button" variant="danger" onClick={() => excluirLaudo(l)}>Excluir</Button>}
                 </li>
               ))}
             </ul>
@@ -346,9 +339,11 @@ export function ContratoDetailPage() {
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-medium text-slate-900">Notas fiscais vinculadas</h2>
-          <Link to={`/notas-fiscais/nova?contrato_id=${id}`} className="text-sm text-brand-700 hover:underline">
-            + Nova nota fiscal
-          </Link>
+          {(papel === "admin" || papel === "financeiro") && (
+            <Link to={`/notas-fiscais/nova?contrato_id=${id}`} className="text-sm text-brand-700 hover:underline">
+              + Nova nota fiscal
+            </Link>
+          )}
         </div>
         <Card>
           {notas.length > 0 ? (

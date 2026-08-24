@@ -37,7 +37,7 @@ export function DashboardPage() {
         supabase
           .from("pagamentos_mensais")
           .select("*, contratos(*, imoveis(*), pessoas(*))")
-          .in("status", ["pendente", "atrasado"])
+          .eq("status", "pendente")
           .lte("data_vencimento", hoje)
           .order("data_vencimento", { ascending: true })
           .returns<PagamentoMensal[]>(),
@@ -240,7 +240,9 @@ export function DashboardPage() {
                     </Link>
                     <p className="mt-1 text-xs text-slate-500">Vencimento: {formatDate(p.data_vencimento)} · {formatBRL(p.valor)}</p>
                   </div>
-                  <Badge color={p.status === "atrasado" ? "red" : "yellow"}>{p.status}</Badge>
+                  <Badge color={p.data_vencimento < todayISO() ? "red" : "yellow"}>
+                    {p.data_vencimento < todayISO() ? "atrasado" : "pendente"}
+                  </Badge>
                 </li>
               ))}
             </ul>

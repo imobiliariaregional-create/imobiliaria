@@ -4,8 +4,10 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader, Card, Field, Input, Select, Textarea, Button, ErrorState, LoadingState } from "@/components/ui";
 import { todayISO } from "@/lib/format";
 import type { Contrato } from "@/lib/types";
+import { useAuth } from "@/lib/auth";
 
 export function NovaNotaFiscalPage() {
+  const { papel, perfilLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const contratoIdParam = searchParams.get("contrato_id") ?? "";
@@ -55,7 +57,10 @@ export function NovaNotaFiscalPage() {
         contrato_id,
         arquivo_url,
       });
-      if (error) throw new Error(error.message);
+      if (error) {
+        if (arquivo_url) await supabase.storage.from("notas-fiscais").remove([arquivo_url]);
+        throw new Error(error.message);
+      }
 
       navigate("/notas-fiscais");
     } catch (err) {
@@ -64,7 +69,10 @@ export function NovaNotaFiscalPage() {
     }
   }
 
-  if (contratos === null) return <LoadingState />;
+  if (contratos === null || perfilLoading) return <LoadingState />;
+  if (papel !== "admin" && papel !== "financeiro") {
+    return <ErrorState message="Seu perfil possui acesso somente de leitura às notas fiscais." />;
+  }
 
   return (
     <div>

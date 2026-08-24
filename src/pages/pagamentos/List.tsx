@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader, Card, Table, Th, Td, EmptyState, Badge, Button, LoadingState } from "@/components/ui";
 import { formatBRL, formatDate, formatMonth, todayISO } from "@/lib/format";
 import type { PagamentoMensal } from "@/lib/types";
+import { useAuth } from "@/lib/auth";
 
 const tipoLabel: Record<string, string> = {
   aluguel: "Aluguel",
@@ -12,6 +13,7 @@ const tipoLabel: Record<string, string> = {
 };
 
 export function PagamentosListPage() {
+  const { papel } = useAuth();
   const [data, setData] = useState<PagamentoMensal[] | null>(null);
   const hoje = todayISO();
 
@@ -30,6 +32,10 @@ export function PagamentosListPage() {
 
   async function toggle(p: PagamentoMensal) {
     const pago = p.status === "pago";
+    if (pago && p.valor_repassado !== null) {
+      alert("Desfaça o repasse ao proprietário antes de marcar este pagamento como pendente.");
+      return;
+    }
     const { error } = await supabase
       .from("pagamentos_mensais")
       .update({ status: pago ? "pendente" : "pago", data_pagamento: pago ? null : todayISO() })
@@ -80,9 +86,14 @@ export function PagamentosListPage() {
                       </Badge>
                     </Td>
                     <Td>
-                      <Button type="button" variant="secondary" onClick={() => toggle(p)}>
+                      {(papel === "admin" || papel === "financeiro") ? <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={p.status === "pago" && p.valor_repassado !== null}
+                        onClick={() => toggle(p)}
+                      >
                         {p.status === "pago" ? "Marcar pendente" : "Marcar pago"}
-                      </Button>
+                      </Button> : <span className="text-xs text-slate-400">Somente leitura</span>}
                     </Td>
                   </tr>
                 );

@@ -11,6 +11,25 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+class HttpError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+  }
+}
+
+async function exigirUsuarioAutenticado(req: Request) {
+  const authorization = req.headers.get("Authorization");
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  if (!authorization?.startsWith("Bearer ")) throw new HttpError("Sessão obrigatória.", 401);
+  if (!supabaseUrl || !anonKey) throw new Error("Ambiente Supabase incompleto.");
+
+  const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: { Authorization: authorization, apikey: anonKey },
+  });
+  if (!response.ok) throw new HttpError("Sessão inválida ou expirada.", 401);
+}
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -125,6 +144,8 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
+    if (req.method !== "POST") return jsonResponse({ error: "Método não permitido." }, 405);
+    await exigirUsuarioAutenticado(req);
     const { action, ...payload } = await req.json();
     if (action === "enviar") {
       return jsonResponse(await enviarParaAssinatura(payload as any));
@@ -137,6 +158,9 @@ Deno.serve(async (req) => {
     }
     return jsonResponse({ error: "Ação inválida." }, 400);
   } catch (err) {
-    return jsonResponse({ error: err instanceof Error ? err.message : "Erro desconhecido." }, 500);
+    return jsonResponse(
+      { error: err instanceof Error ? err.message : "Erro desconhecido." },
+      err instanceof HttpError ? err.status : 500
+    );
   }
 });

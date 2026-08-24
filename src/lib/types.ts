@@ -1,7 +1,7 @@
 export type TipoOperacao = "aluguel" | "administracao" | "venda";
 export type StatusImovel = "disponivel" | "ocupado" | "vendido";
 export type StatusContrato = "ativo" | "encerrado" | "renovado";
-export type StatusPagamento = "pago" | "pendente" | "atrasado";
+export type StatusPagamento = "pago" | "pendente";
 export type TipoConsumo = "agua" | "energia";
 export type StatusConsumo = "pago" | "pendente";
 export type TipoLaudo = "entrada" | "renovacao" | "saida";
@@ -9,6 +9,14 @@ export type FormaComissaoVenda = "percentual" | "fixo";
 export type TipoPessoa = "fisica" | "juridica";
 export type TipoContaBancaria = "corrente" | "poupanca";
 export type TipoImovel = "residencial" | "comercial";
+export type PapelUsuario = "admin" | "financeiro" | "corretor";
+
+export interface Perfil {
+  user_id: string;
+  papel: PapelUsuario;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface Proprietario {
   id: string;
@@ -94,6 +102,7 @@ export interface PagamentoMensal {
   id: string;
   contrato_id: string;
   mes_referencia: string;
+  valor_bruto: number;
   valor: number;
   data_vencimento: string;
   data_pagamento: string | null;

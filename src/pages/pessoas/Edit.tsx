@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
-import { PageHeader, Button, LoadingState } from "@/components/ui";
+import { PageHeader, Button, Card, LoadingState } from "@/components/ui";
 import { PessoaForm } from "@/components/PessoaForm";
 import type { Pessoa } from "@/lib/types";
+import { confirmDeletion } from "@/lib/actions";
+import { useAuth } from "@/lib/auth";
 
 export function EditarPessoaPage() {
+  const { papel } = useAuth();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [data, setData] = useState<Pessoa | null | undefined>(undefined);
@@ -21,6 +24,7 @@ export function EditarPessoaPage() {
   }
 
   async function handleDelete() {
+    if (!confirmDeletion("Excluir esta pessoa?")) return;
     const { error } = await supabase.from("pessoas").delete().eq("id", id);
     if (error) throw new Error(error.message);
     navigate("/pessoas");
@@ -32,9 +36,13 @@ export function EditarPessoaPage() {
   return (
     <div>
       <PageHeader title={data.nome} />
-      <PessoaForm onSubmit={handleSubmit} defaultValues={data} />
+      {(papel === "admin" || papel === "corretor") ? (
+        <PessoaForm onSubmit={handleSubmit} defaultValues={data} />
+      ) : (
+        <Card className="max-w-xl p-4 text-sm text-slate-600">Seu perfil possui acesso somente de leitura.</Card>
+      )}
       <div className="max-w-xl mt-4">
-        <Button type="button" variant="danger" onClick={handleDelete}>Excluir pessoa</Button>
+        {papel === "admin" && <Button type="button" variant="danger" onClick={handleDelete}>Excluir pessoa</Button>}
       </div>
     </div>
   );

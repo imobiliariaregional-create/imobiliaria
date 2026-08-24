@@ -26,7 +26,7 @@ const groups: { label: string; links: NavItem[] }[] = [
 ];
 
 export function Nav({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { session } = useAuth();
+  const { session, papel } = useAuth();
   const email = session?.user.email ?? "Equipe Regional";
   const initials = email.slice(0, 2).toUpperCase();
 
@@ -65,7 +65,7 @@ export function Nav({ open, onClose }: { open: boolean; onClose: () => void }) {
           <div className="flex items-center gap-3 rounded-2xl bg-white/[0.06] p-3">
             <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-emerald-200 text-xs font-bold text-brand-900">{initials}</span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-semibold text-white">Equipe Regional</p>
+              <p className="truncate text-xs font-semibold capitalize text-white">{papel ?? "Equipe Regional"}</p>
               <p className="truncate text-[11px] text-emerald-100/45">{email}</p>
             </div>
             <button type="button" onClick={() => supabase.auth.signOut()} className="grid size-9 shrink-0 place-items-center rounded-xl text-emerald-50/55 transition hover:bg-white/10 hover:text-white" aria-label="Sair"><LogOut size={17} /></button>

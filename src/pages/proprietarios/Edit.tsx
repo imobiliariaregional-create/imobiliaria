@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
-import { PageHeader, Button, LoadingState } from "@/components/ui";
+import { PageHeader, Button, Card, LoadingState } from "@/components/ui";
 import { ProprietarioForm } from "@/components/ProprietarioForm";
 import type { Proprietario } from "@/lib/types";
+import { confirmDeletion } from "@/lib/actions";
+import { useAuth } from "@/lib/auth";
 
 export function EditarProprietarioPage() {
+  const { papel } = useAuth();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [data, setData] = useState<Proprietario | null | undefined>(undefined);
@@ -26,6 +29,7 @@ export function EditarProprietarioPage() {
   }
 
   async function handleDelete() {
+    if (!confirmDeletion("Excluir este proprietário?")) return;
     const { error } = await supabase.from("proprietarios").delete().eq("id", id);
     if (error) throw new Error(error.message);
     navigate("/proprietarios");
@@ -37,9 +41,13 @@ export function EditarProprietarioPage() {
   return (
     <div>
       <PageHeader title={data.nome} />
-      <ProprietarioForm onSubmit={handleSubmit} defaultValues={data} />
+      {(papel === "admin" || papel === "corretor") ? (
+        <ProprietarioForm onSubmit={handleSubmit} defaultValues={data} />
+      ) : (
+        <Card className="max-w-xl p-4 text-sm text-slate-600">Seu perfil possui acesso somente de leitura.</Card>
+      )}
       <div className="max-w-xl mt-4">
-        <Button type="button" variant="danger" onClick={handleDelete}>Excluir proprietário</Button>
+        {papel === "admin" && <Button type="button" variant="danger" onClick={handleDelete}>Excluir proprietário</Button>}
       </div>
     </div>
   );

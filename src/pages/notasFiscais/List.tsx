@@ -4,8 +4,11 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader, Card, Table, Th, Td, EmptyState, Button, LoadingState } from "@/components/ui";
 import { formatBRL, formatDate } from "@/lib/format";
 import type { NotaFiscal } from "@/lib/types";
+import { confirmDeletion } from "@/lib/actions";
+import { useAuth } from "@/lib/auth";
 
 export function NotasFiscaisListPage() {
+  const { papel } = useAuth();
   const [data, setData] = useState<NotaFiscal[] | null>(null);
   const [urls, setUrls] = useState<Record<string, string>>({});
 
@@ -37,14 +40,13 @@ export function NotasFiscaisListPage() {
   }, [data]);
 
   async function excluir(nota: NotaFiscal) {
-    if (nota.arquivo_url) {
-      await supabase.storage.from("notas-fiscais").remove([nota.arquivo_url]);
-    }
+    if (!confirmDeletion("Excluir esta nota fiscal?")) return;
     const { error } = await supabase.from("notas_fiscais").delete().eq("id", nota.id);
     if (error) {
       alert(error.message);
       return;
     }
+    if (nota.arquivo_url) await supabase.storage.from("notas-fiscais").remove([nota.arquivo_url]);
     reload();
   }
 
@@ -52,7 +54,7 @@ export function NotasFiscaisListPage() {
 
   return (
     <div>
-      <PageHeader title="Notas Fiscais" action={{ href: "/notas-fiscais/nova", label: "Nova nota fiscal" }} />
+      <PageHeader title="Notas Fiscais" action={papel === "admin" || papel === "financeiro" ? { href: "/notas-fiscais/nova", label: "Nova nota fiscal" } : undefined} />
       <p className="text-sm text-slate-500 -mt-4 mb-6">Total registrado: {formatBRL(totalGeral)}</p>
       <Card>
         {data === null ? (
@@ -94,7 +96,7 @@ export function NotasFiscaisListPage() {
                     )}
                   </Td>
                   <Td>
-                    <Button type="button" variant="danger" onClick={() => excluir(nota)}>Excluir</Button>
+                    {(papel === "admin" || papel === "financeiro") ? <Button type="button" variant="danger" onClick={() => excluir(nota)}>Excluir</Button> : <span className="text-xs text-slate-400">Somente leitura</span>}
                   </Td>
                 </tr>
               ))}

@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader, Card, Table, Th, Td, EmptyState, Badge, LoadingState } from "@/components/ui";
 import { PapelTimbradoCard } from "@/components/PapelTimbradoCard";
 import type { ModeloContrato } from "@/lib/types";
+import { useAuth } from "@/lib/auth";
 
 const tipoLabel: Record<string, string> = {
   aluguel: "Aluguel",
@@ -12,6 +13,7 @@ const tipoLabel: Record<string, string> = {
 };
 
 export function ModelosContratoListPage() {
+  const { papel } = useAuth();
   const [data, setData] = useState<ModeloContrato[] | null>(null);
 
   useEffect(() => {
@@ -25,7 +27,7 @@ export function ModelosContratoListPage() {
 
   return (
     <div>
-      <PageHeader title="Modelos de Contrato" action={{ href: "/modelos-contrato/novo", label: "Novo modelo" }} />
+      <PageHeader title="Modelos de Contrato" action={papel === "admin" || papel === "corretor" ? { href: "/modelos-contrato/novo", label: "Novo modelo" } : undefined} />
       <PapelTimbradoCard />
       <Card>
         {data === null ? (

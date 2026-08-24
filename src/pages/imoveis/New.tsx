@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
-import { PageHeader, LoadingState } from "@/components/ui";
+import { PageHeader, ErrorState, LoadingState } from "@/components/ui";
 import { ImovelForm, type ImovelPayload } from "@/components/ImovelForm";
 import type { Proprietario } from "@/lib/types";
+import { useAuth } from "@/lib/auth";
 
 export function NovoImovelPage() {
+  const { papel, perfilLoading } = useAuth();
   const navigate = useNavigate();
   const [proprietarios, setProprietarios] = useState<Proprietario[] | null>(null);
 
@@ -24,7 +26,8 @@ export function NovoImovelPage() {
     navigate("/imoveis");
   }
 
-  if (proprietarios === null) return <LoadingState />;
+  if (proprietarios === null || perfilLoading) return <LoadingState />;
+  if (papel !== "admin" && papel !== "corretor") return <ErrorState message="Seu perfil possui acesso somente de leitura aos imóveis." />;
 
   return (
     <div>

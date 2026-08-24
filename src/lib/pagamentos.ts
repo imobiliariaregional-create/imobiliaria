@@ -4,6 +4,7 @@ import type { Contrato } from "@/lib/types";
 export interface NovoPagamento {
   contrato_id: string;
   mes_referencia: string;
+  valor_bruto: number;
   valor: number;
   data_vencimento: string;
   status: "pendente";
@@ -26,6 +27,7 @@ export function gerarPagamentosIniciais(contrato: {
   valor_aluguel: number | null;
   dia_pagamento: number | null;
   data_inicio: string;
+  duracao_meses: number | null;
   vigencia_final: string | null;
   percentual_comissao: number | null;
   valor_comissao_fixo: number | null;
@@ -39,6 +41,7 @@ export function gerarPagamentosIniciais(contrato: {
       {
         contrato_id: contrato.id,
         mes_referencia: mesInicio,
+        valor_bruto: Number(contrato.valor_aluguel ?? 0),
         valor: Number(contrato.valor_aluguel ?? 0),
         data_vencimento: vencimentoDoMes(mesInicio, contrato.dia_pagamento),
         status: "pendente",
@@ -56,6 +59,7 @@ export function gerarPagamentosIniciais(contrato: {
       {
         contrato_id: contrato.id,
         mes_referencia: mesInicio,
+        valor_bruto: Number(contrato.valor_venda ?? 0),
         valor: valorComissao,
         data_vencimento: contrato.data_inicio,
         status: "pendente",
@@ -66,20 +70,17 @@ export function gerarPagamentosIniciais(contrato: {
   // administracao: 10% do aluguel, gerado mensalmente até a vigência final
   const valorMensal = Number(contrato.valor_aluguel ?? 0) * 0.1;
   const pagamentos: NovoPagamento[] = [];
-  let mesAtual = mesInicio;
-  let i = 0;
-  while (i < LIMITE_MESES) {
+  const quantidadeMeses = Math.min(Math.max(contrato.duracao_meses ?? 12, 1), LIMITE_MESES);
+  for (let i = 0; i < quantidadeMeses; i++) {
+    const mesAtual = addMonthsISO(mesInicio, i);
     pagamentos.push({
       contrato_id: contrato.id,
       mes_referencia: mesAtual,
+      valor_bruto: Number(contrato.valor_aluguel ?? 0),
       valor: valorMensal,
       data_vencimento: vencimentoDoMes(mesAtual, contrato.dia_pagamento),
       status: "pendente",
     });
-    if (contrato.vigencia_final && mesAtual >= contrato.vigencia_final.slice(0, 7) + "-01") break;
-    if (!contrato.vigencia_final && i >= 11) break; // sem vigência definida: gera só 12 meses por segurança
-    mesAtual = addMonthsISO(mesAtual, 1);
-    i++;
   }
   return pagamentos;
 }

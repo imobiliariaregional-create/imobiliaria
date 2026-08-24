@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, ProtectedRoute } from "@/lib/auth";
 import { AppLayout } from "@/components/AppLayout";
@@ -15,7 +16,6 @@ import { ImovelDetailPage } from "@/pages/imoveis/Detail";
 import { ContratosListPage } from "@/pages/contratos/List";
 import { NovoContratoPage } from "@/pages/contratos/New";
 import { ContratoDetailPage } from "@/pages/contratos/Detail";
-import { ContratoDocumentoPage } from "@/pages/contratos/Documento";
 import { ModelosContratoListPage } from "@/pages/modelosContrato/List";
 import { NovoModeloContratoPage } from "@/pages/modelosContrato/New";
 import { EditarModeloContratoPage } from "@/pages/modelosContrato/Edit";
@@ -24,6 +24,10 @@ import { PrestacaoContasListPage } from "@/pages/prestacaoContas/List";
 import { ContasConsumoListPage } from "@/pages/contasConsumo/List";
 import { NotasFiscaisListPage } from "@/pages/notasFiscais/List";
 import { NovaNotaFiscalPage } from "@/pages/notasFiscais/New";
+
+const ContratoDocumentoPage = lazy(() =>
+  import("@/pages/contratos/Documento").then((modulo) => ({ default: modulo.ContratoDocumentoPage })),
+);
 
 export function App() {
   return (
@@ -57,7 +61,14 @@ export function App() {
             <Route path="/contratos" element={<ContratosListPage />} />
             <Route path="/contratos/novo" element={<NovoContratoPage />} />
             <Route path="/contratos/:id" element={<ContratoDetailPage />} />
-            <Route path="/contratos/:id/documento" element={<ContratoDocumentoPage />} />
+            <Route
+              path="/contratos/:id/documento"
+              element={
+                <Suspense fallback={<div className="py-10 text-center text-sm text-slate-500">Carregando documento...</div>}>
+                  <ContratoDocumentoPage />
+                </Suspense>
+              }
+            />
 
             <Route path="/modelos-contrato" element={<ModelosContratoListPage />} />
             <Route path="/modelos-contrato/novo" element={<NovoModeloContratoPage />} />

@@ -15,8 +15,8 @@ Todos esses valores aparecem na tela **Pagamentos**, que serve como o controle d
 ## 1. Criar o projeto no Supabase
 
 1. Acesse [supabase.com](https://supabase.com) e crie um novo projeto (grátis).
-2. Em **SQL Editor**, cole e execute o conteúdo de [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql). Isso cria todas as tabelas, as permissões (RLS) e os buckets de arquivos (`laudos-vistoria` e `notas-fiscais`).
-3. Em **Authentication → Users**, clique em **Add user** para criar o login de cada funcionário (e-mail + senha). Não há tela de cadastro pública — o acesso é só para quem a equipe cadastrar aqui.
+2. Em **SQL Editor**, execute **todos** os arquivos de [`supabase/migrations/`](supabase/migrations/) na ordem do nome (`0001` até `0007` e, por último, a migração datada). Eles criam o schema completo, as permissões, as operações transacionais e os buckets de arquivos. Não publique uma versão nova do frontend antes de aplicar as migrações correspondentes.
+3. Em **Authentication → Users**, clique em **Add user** para criar o login de cada funcionário (e-mail + senha). Não há tela de cadastro pública. Usuários novos recebem o papel `corretor`; um administrador pode alterar `public.perfis.papel` para `admin`, `financeiro` ou `corretor`.
 4. Em **Project Settings → API**, copie a **Project URL** e a **anon public key** (nunca a `service_role`/secret key — essa não é usada neste projeto e não deve ficar em nenhum arquivo do repositório).
 
 ## 2. Configurar o projeto localmente
@@ -39,6 +39,13 @@ Rodar localmente:
 npm run dev
 ```
 
+Requer **Node.js 22 ou superior**. Para validar as regras financeiras e de datas:
+
+```bash
+npm test
+npm run build
+```
+
 ## 3. Publicar no GitHub Pages
 
 O repositório já vem com um workflow (`.github/workflows/deploy.yml`) que builda e publica automaticamente a cada push na branch `main`.
@@ -56,7 +63,7 @@ Se o nome do repositório não for `imobiliaria`, ajuste a constante `REPO_NAME`
 ## Segurança
 
 - Como é uma SPA sem servidor, a sessão de login fica no navegador (padrão do Supabase Auth via `localStorage`), e não em cookie protegido por servidor. Isso é normal para esse tipo de site, mas significa que quem tiver acesso ao navegador/computador logado tem acesso à sessão.
-- Todo o controle de acesso real está nas políticas de **Row Level Security** do Supabase — qualquer usuário autenticado tem acesso de leitura/escrita nas tabelas; usuários não autenticados não veem nada.
+- Todo o controle de acesso real está nas políticas de **Row Level Security** do Supabase. Administradores controlam exclusões e configurações; o financeiro registra recebimentos, repasses, contas e notas; corretores gerenciam cadastros e contratos.
 - A `anon key` é pública por natureza (fica visível no código do site) — isso é esperado e seguro *desde que* o RLS esteja ativo em todas as tabelas, como já está no `0001_init.sql`.
 
 ## Estrutura
@@ -65,7 +72,7 @@ Se o nome do repositório não for `imobiliaria`, ajuste a constante `REPO_NAME`
 - `src/lib/supabase.ts` — client do Supabase usado no navegador.
 - `src/lib/auth.tsx` — contexto de sessão e rota protegida.
 - `src/lib/pagamentos.ts` — regra de geração automática dos pagamentos mensais/únicos por tipo de contrato.
-- `supabase/migrations/0001_init.sql` — schema completo do banco.
+- `supabase/migrations/` — histórico completo e ordenado do schema do banco.
 - `.github/workflows/deploy.yml` — build e publicação automática no GitHub Pages.
 
 ## Próximos passos possíveis (fora do escopo desta versão)

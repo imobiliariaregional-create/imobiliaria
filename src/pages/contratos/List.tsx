@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader, Card, Table, Th, Td, EmptyState, Badge, LoadingState } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 import type { Contrato } from "@/lib/types";
+import { useAuth } from "@/lib/auth";
 
 const tipoLabel: Record<string, string> = {
   aluguel: "Aluguel",
@@ -12,6 +13,7 @@ const tipoLabel: Record<string, string> = {
 };
 
 export function ContratosListPage() {
+  const { papel } = useAuth();
   const [data, setData] = useState<Contrato[] | null>(null);
 
   useEffect(() => {
@@ -25,7 +27,7 @@ export function ContratosListPage() {
 
   return (
     <div>
-      <PageHeader title="Contratos" action={{ href: "/contratos/novo", label: "Novo contrato" }} />
+      <PageHeader title="Contratos" action={papel === "admin" || papel === "corretor" ? { href: "/contratos/novo", label: "Novo contrato" } : undefined} />
       <Card>
         {data === null ? (
           <LoadingState />

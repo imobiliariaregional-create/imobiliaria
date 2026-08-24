@@ -4,10 +4,12 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader, Card, Table, Th, Td, EmptyState, Badge, Button, LoadingState } from "@/components/ui";
 import { formatMonth, todayISO } from "@/lib/format";
 import type { ContaConsumo } from "@/lib/types";
+import { useAuth } from "@/lib/auth";
 
 const tipoLabel: Record<string, string> = { agua: "Água", energia: "Energia" };
 
 export function ContasConsumoListPage() {
+  const { papel } = useAuth();
   const [data, setData] = useState<ContaConsumo[] | null>(null);
 
   async function reload() {
@@ -70,9 +72,11 @@ export function ContasConsumoListPage() {
                     <Badge color={c.status_pagamento === "pago" ? "green" : "yellow"}>{c.status_pagamento}</Badge>
                   </Td>
                   <Td>
-                    <Button type="button" variant="secondary" onClick={() => toggle(c)}>
-                      {c.status_pagamento === "pago" ? "Marcar pendente" : "Marcar pago"}
-                    </Button>
+                    {(papel === "admin" || papel === "financeiro") ? (
+                      <Button type="button" variant="secondary" onClick={() => toggle(c)}>
+                        {c.status_pagamento === "pago" ? "Marcar pendente" : "Marcar pago"}
+                      </Button>
+                    ) : <span className="text-xs text-slate-400">Somente leitura</span>}
                   </Td>
                 </tr>
               ))}

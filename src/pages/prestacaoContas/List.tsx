@@ -4,12 +4,14 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader, Card, Table, Th, Td, EmptyState, Badge, Button, Field, Select, Input, LoadingState } from "@/components/ui";
 import { formatBRL, formatMonth, todayISO } from "@/lib/format";
 import type { Proprietario, PagamentoMensal } from "@/lib/types";
+import { useAuth } from "@/lib/auth";
 
 function mesAtualISO() {
   return todayISO().slice(0, 7);
 }
 
 export function PrestacaoContasListPage() {
+  const { papel } = useAuth();
   const [proprietarios, setProprietarios] = useState<Proprietario[]>([]);
   const [proprietarioId, setProprietarioId] = useState<string>("");
   const [mes, setMes] = useState<string>(mesAtualISO());
@@ -54,6 +56,10 @@ export function PrestacaoContasListPage() {
 
   async function marcarRepassado(p: PagamentoMensal, liquido: number) {
     const jaRepassado = p.valor_repassado !== null;
+    if (!jaRepassado && p.status !== "pago") {
+      alert("Registre primeiro o recebimento do aluguel antes de marcar o repasse.");
+      return;
+    }
     const { error } = await supabase
       .from("pagamentos_mensais")
       .update({
@@ -68,7 +74,7 @@ export function PrestacaoContasListPage() {
     reload();
   }
 
-  const totalBruto = (linhas ?? []).reduce((acc, p) => acc + Number(p.contratos?.valor_aluguel ?? 0), 0);
+  const totalBruto = (linhas ?? []).reduce((acc, p) => acc + Number(p.valor_bruto), 0);
   const totalComissao = (linhas ?? []).reduce((acc, p) => acc + Number(p.valor), 0);
   const totalLiquido = totalBruto - totalComissao;
 
@@ -126,7 +132,7 @@ export function PrestacaoContasListPage() {
               </thead>
               <tbody>
                 {linhas.map((p) => {
-                  const bruto = Number(p.contratos?.valor_aluguel ?? 0);
+                  const bruto = Number(p.valor_bruto);
                   const comissao = Number(p.valor);
                   const liquido = bruto - comissao;
                   const repassado = p.valor_repassado !== null;
@@ -151,9 +157,15 @@ export function PrestacaoContasListPage() {
                         )}
                       </Td>
                       <Td>
-                        <Button type="button" variant="secondary" onClick={() => marcarRepassado(p, liquido)}>
+                        {(papel === "admin" || papel === "financeiro") ? <Button
+                          type="button"
+                          variant="secondary"
+                          disabled={!repassado && p.status !== "pago"}
+                          title={!repassado && p.status !== "pago" ? "Marque primeiro o pagamento como recebido" : undefined}
+                          onClick={() => marcarRepassado(p, liquido)}
+                        >
                           {repassado ? "Desfazer" : "Marcar repassado"}
-                        </Button>
+                        </Button> : <span className="text-xs text-slate-400">Somente leitura</span>}
                       </Td>
                     </tr>
                   );

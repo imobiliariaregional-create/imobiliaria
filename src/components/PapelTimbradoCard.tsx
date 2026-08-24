@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import { Card, Button, ErrorState } from "@/components/ui";
 import { getLetterheadUrl, uploadLetterhead, removeLetterhead } from "@/lib/letterhead";
+import { confirmDeletion } from "@/lib/actions";
+import { useAuth } from "@/lib/auth";
 
 export function PapelTimbradoCard() {
+  const { papel } = useAuth();
   const [url, setUrl] = useState<string | null | undefined>(undefined);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +33,7 @@ export function PapelTimbradoCard() {
   }
 
   async function handleRemove() {
+    if (!confirmDeletion("Remover o papel timbrado usado nos contratos?")) return;
     setPending(true);
     setError(null);
     try {
@@ -49,7 +53,9 @@ export function PapelTimbradoCard() {
         Imagem de fundo (tamanho A4) usada ao exportar contratos em PDF e Word. Deixe espaço em branco no meio da
         imagem para o texto do contrato.
       </p>
-      {url ? (
+      {papel !== "admin" ? (
+        <p className="text-sm text-slate-500">Somente administradores podem alterar o papel timbrado.</p>
+      ) : url ? (
         <div className="flex items-start gap-4">
           <img src={url} alt="Papel timbrado atual" className="w-32 border border-slate-200 rounded" />
           <div className="space-y-2">

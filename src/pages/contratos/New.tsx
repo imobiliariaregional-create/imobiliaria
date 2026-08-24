@@ -3,11 +3,12 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { PageHeader, EmptyState, LoadingState } from "@/components/ui";
 import { ContratoForm, type ContratoPayload } from "@/components/ContratoForm";
-import { gerarPagamentosIniciais } from "@/lib/pagamentos";
 import { mapaContratosAtivosPorImovel } from "@/lib/imovelLabel";
 import type { Contrato, Imovel, Pessoa } from "@/lib/types";
+import { useAuth } from "@/lib/auth";
 
 export function NovoContratoPage() {
+  const { papel, perfilLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const imovelIdParam = searchParams.get("imovel_id") ?? undefined;
@@ -29,41 +30,29 @@ export function NovoContratoPage() {
   }, []);
 
   async function handleSubmit(data: ContratoPayload) {
-    const { data: numeroContrato, error: numeroError } = await supabase.rpc("proximo_numero_contrato", {
-      p_ano: Number(data.data_inicio.slice(0, 4)),
-    });
-    if (numeroError) throw new Error(numeroError.message);
-
-    const payload = {
-      ...data,
-      numero_contrato: numeroContrato,
-      data_ultima_visita: data.periodo_visita_dias ? data.data_inicio : null,
-    };
-
-    const { data: contrato, error } = await supabase.from("contratos").insert(payload).select("*").single();
+    const { data: contrato, error } = await supabase.rpc("criar_contrato_com_pagamentos", { p_payload: data });
     if (error) throw new Error(error.message);
-
-    const pagamentos = gerarPagamentosIniciais(contrato);
-    if (pagamentos.length > 0) {
-      const { error: pagError } = await supabase.from("pagamentos_mensais").insert(pagamentos);
-      if (pagError) throw new Error(pagError.message);
-    }
-
-    navigate(`/contratos/${contrato.id}`);
+    navigate(`/contratos/${(contrato as unknown as Contrato).id}`);
   }
 
-  if (imoveis === null) return <LoadingState />;
+  if (imoveis === null || perfilLoading) return <LoadingState />;
 
-  if (imoveis.length === 0) {
+  if (papel !== "admin" && papel !== "corretor") {
+    return <EmptyState message="Seu perfil possui acesso somente de leitura aos contratos." />;
+  }
+
+  const imoveisDisponiveis = imoveis.filter((imovel) => imovel.status === "disponivel" && !contratosAtivos.has(imovel.id));
+
+  if (imoveisDisponiveis.length === 0) {
     return (
       <div>
         <PageHeader title="Novo contrato" />
-        <EmptyState message="Cadastre um imóvel antes de criar um contrato." />
+        <EmptyState message="Não há imóveis disponíveis sem contrato ativo." />
       </div>
     );
   }
 
-  const imovelFixo = imovelIdParam ? imoveis.find((i) => i.id === imovelIdParam) : undefined;
+  const imovelFixo = imovelIdParam ? imoveisDisponiveis.find((i) => i.id === imovelIdParam) : undefined;
 
   return (
     <div>
@@ -71,7 +60,7 @@ export function NovoContratoPage() {
       <ContratoForm
         onSubmit={handleSubmit}
         mode="create"
-        imoveis={imoveis}
+        imoveis={imoveisDisponiveis}
         pessoas={pessoas}
         imovelFixo={imovelFixo}
         contratosAtivosPorImovel={contratosAtivos}

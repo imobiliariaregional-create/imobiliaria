@@ -122,7 +122,7 @@ export function ContratoForm({
         </Field>
 
         <Field label={tipo === "venda" ? "Comprador" : "Inquilino"} htmlFor="pessoa_id">
-          <Select id="pessoa_id" name="pessoa_id" defaultValue={defaultValues?.pessoa_id ?? ""}>
+          <Select id="pessoa_id" name="pessoa_id" required defaultValue={defaultValues?.pessoa_id ?? ""}>
             <option value="">Selecione...</option>
             {pessoas.map((p) => (
               <option key={p.id} value={p.id}>
@@ -180,6 +180,7 @@ export function ContratoForm({
                 name="duracao_meses"
                 type="number"
                 min={1}
+                max={60}
                 required
                 defaultValue={defaultValues?.duracao_meses ?? ""}
                 onChange={(e) => setDuracaoMeses(e.target.value)}
@@ -251,7 +252,8 @@ export function ContratoForm({
                   name="percentual_comissao"
                   type="number"
                   step="0.01"
-                  min="0"
+                  min="0.01"
+                  required
                   max="100"
                   placeholder="ex: 5"
                   defaultValue={defaultValues?.percentual_comissao ?? 5}
@@ -264,7 +266,8 @@ export function ContratoForm({
                   name="valor_comissao_fixo"
                   type="number"
                   step="0.01"
-                  min="0"
+                  min="0.01"
+                  required
                   defaultValue={defaultValues?.valor_comissao_fixo ?? ""}
                 />
               </Field>
