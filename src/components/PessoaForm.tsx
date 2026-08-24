@@ -70,7 +70,7 @@ export function PessoaForm({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="CPF/CNPJ" htmlFor="cpf_cnpj">
             <Input id="cpf_cnpj" name="cpf_cnpj" defaultValue={defaultValues?.cpf_cnpj ?? ""} />
           </Field>
@@ -80,12 +80,12 @@ export function PessoaForm({
         </div>
 
         {tipoPessoa === "juridica" && (
-          <div className="border border-slate-200 rounded-md p-4 space-y-4 bg-slate-50">
+          <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
             <p className="text-xs font-medium text-slate-500 uppercase">Representante legal</p>
             <Field label="Nome do representante" htmlFor="representante_nome">
               <Input id="representante_nome" name="representante_nome" defaultValue={defaultValues?.representante_nome ?? ""} />
             </Field>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="CPF do representante" htmlFor="representante_cpf">
                 <Input id="representante_cpf" name="representante_cpf" defaultValue={defaultValues?.representante_cpf ?? ""} />
               </Field>
@@ -100,7 +100,7 @@ export function PessoaForm({
           <Input id="endereco" name="endereco" defaultValue={defaultValues?.endereco ?? ""} />
         </Field>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Telefone" htmlFor="telefone">
             <Input id="telefone" name="telefone" defaultValue={defaultValues?.telefone ?? ""} />
           </Field>

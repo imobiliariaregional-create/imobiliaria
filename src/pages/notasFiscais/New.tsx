@@ -74,7 +74,7 @@ export function NovaNotaFiscalPage() {
           <Field label="Número da nota" htmlFor="numero">
             <Input id="numero" name="numero" />
           </Field>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Valor (R$)" htmlFor="valor">
               <Input id="valor" name="valor" type="number" step="0.01" min="0" required />
             </Field>

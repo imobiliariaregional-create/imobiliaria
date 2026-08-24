@@ -294,7 +294,7 @@ export function ContratoDetailPage() {
       <div>
         <h2 className="font-medium text-slate-900 mb-3">Laudos de vistoria</h2>
         <Card className="p-4">
-          <form onSubmit={handleCriarLaudo} className="grid grid-cols-2 gap-3 mb-4">
+          <form onSubmit={handleCriarLaudo} className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Tipo" htmlFor="tipo_laudo">
               <Select id="tipo_laudo" name="tipo">
                 <option value="entrada">Entrada</option>

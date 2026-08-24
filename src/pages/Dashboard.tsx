@@ -5,6 +5,7 @@ import { Card, Badge, EmptyState, LoadingState } from "@/components/ui";
 import { formatBRL, formatDate, formatMonth, todayISO, addDaysISO, diffDiasISO } from "@/lib/format";
 import { imovelLabel } from "@/lib/imovelLabel";
 import type { Contrato, PagamentoMensal, ContaConsumo, LaudoVistoria } from "@/lib/types";
+import { ArrowUpRight, Banknote, CalendarClock, CircleAlert, Droplets, FileClock, House, WalletCards } from "lucide-react";
 
 export function DashboardPage() {
   const [loading, setLoading] = useState(true);
@@ -102,37 +103,56 @@ export function DashboardPage() {
 
   if (loading) return <LoadingState />;
 
+  const totalPendencias = pagamentosPendentes.length + contasPendentes.length + contratosVencidos.length;
+
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-slate-900 mb-6">Dashboard</h1>
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="eyebrow mb-2">Visão geral</p>
+          <h1 className="text-3xl font-semibold tracking-[-0.04em] text-slate-950 sm:text-[2.25rem]">Olá, equipe Regional</h1>
+          <p className="mt-2 text-sm text-slate-500">Acompanhe os números e as prioridades da sua operação.</p>
+        </div>
+        <div className="inline-flex w-fit items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-medium text-slate-600 shadow-sm">
+          <CalendarClock size={16} className="text-brand-700" /> Atualizado agora
+        </div>
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <Card className="p-5">
-          <p className="text-sm text-slate-500">Recebido pela imobiliária este mês</p>
-          <p className="text-2xl font-semibold text-slate-900 mt-1">{formatBRL(totalRecebidoMes)}</p>
+      <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Card className="relative overflow-hidden p-5">
+          <div className="flex items-start justify-between gap-4"><span className="grid size-11 place-items-center rounded-2xl bg-brand-50 text-brand-700"><Banknote size={21} /></span><span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Este mês</span></div>
+          <p className="mt-5 text-sm font-medium text-slate-500">Receita recebida</p>
+          <p className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950">{formatBRL(totalRecebidoMes)}</p>
         </Card>
         <Card className="p-5">
-          <p className="text-sm text-slate-500">Pagamentos pendentes/atrasados</p>
-          <p className="text-2xl font-semibold text-slate-900 mt-1">{pagamentosPendentes.length}</p>
+          <div className="flex items-start justify-between gap-4"><span className="grid size-11 place-items-center rounded-2xl bg-amber-50 text-amber-700"><WalletCards size={21} /></span><ArrowUpRight size={17} className="text-slate-300" /></div>
+          <p className="mt-5 text-sm font-medium text-slate-500">Pagamentos pendentes</p>
+          <p className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950">{pagamentosPendentes.length}</p>
         </Card>
         <Card className="p-5">
-          <p className="text-sm text-slate-500">Contas de água/energia pendentes</p>
-          <p className="text-2xl font-semibold text-slate-900 mt-1">{contasPendentes.length}</p>
+          <div className="flex items-start justify-between gap-4"><span className="grid size-11 place-items-center rounded-2xl bg-sky-50 text-sky-700"><Droplets size={21} /></span><ArrowUpRight size={17} className="text-slate-300" /></div>
+          <p className="mt-5 text-sm font-medium text-slate-500">Contas de consumo</p>
+          <p className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950">{contasPendentes.length}</p>
+        </Card>
+        <Card className="border-slate-800 bg-[#10251e] p-5 text-white">
+          <div className="flex items-start justify-between gap-4"><span className="grid size-11 place-items-center rounded-2xl bg-white/10 text-emerald-200"><CircleAlert size={21} /></span><span className="size-2 rounded-full bg-amber-300 shadow-[0_0_0_5px_rgba(252,211,77,0.12)]" /></div>
+          <p className="mt-5 text-sm font-medium text-emerald-50/55">Total de pendências</p>
+          <p className="mt-1 text-2xl font-semibold tracking-[-0.03em]">{totalPendencias}</p>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="p-5">
-          <h2 className="font-medium text-slate-900 mb-4">Contratos a vencer (próximos 90 dias)</h2>
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <Card className="overflow-hidden">
+          <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4"><span className="grid size-9 place-items-center rounded-xl bg-amber-50 text-amber-700"><FileClock size={18} /></span><div><h2 className="text-sm font-semibold text-slate-900">Contratos a vencer</h2><p className="text-xs text-slate-500">Próximos 90 dias</p></div></div>
           {contratosAVencer.length > 0 ? (
-            <ul className="space-y-3">
+            <ul className="divide-y divide-slate-100 px-5">
               {contratosAVencer.map((c) => (
-                <li key={c.id} className="flex items-center justify-between text-sm">
+                <li key={c.id} className="flex items-center justify-between gap-4 py-4 text-sm">
                   <div>
                     <Link to={`/contratos/${c.id}`} className="text-brand-700 hover:underline font-medium">
                       {imovelLabel(c.imoveis!, c)}
                     </Link>
-                    <p className="text-slate-500">Vigência final: {formatDate(c.vigencia_final)}</p>
+                    <p className="mt-1 text-xs text-slate-500">Vigência final: {formatDate(c.vigencia_final)}</p>
                   </div>
                   <Badge color="yellow">{c.tipo}</Badge>
                 </li>
@@ -143,17 +163,17 @@ export function DashboardPage() {
           )}
         </Card>
 
-        <Card className="p-5">
-          <h2 className="font-medium text-slate-900 mb-4">Contratos vencidos</h2>
+        <Card className="overflow-hidden">
+          <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4"><span className="grid size-9 place-items-center rounded-xl bg-red-50 text-red-700"><CircleAlert size={18} /></span><div><h2 className="text-sm font-semibold text-slate-900">Contratos vencidos</h2><p className="text-xs text-slate-500">Exigem atenção da equipe</p></div></div>
           {contratosVencidos.length > 0 ? (
-            <ul className="space-y-3">
+            <ul className="divide-y divide-slate-100 px-5">
               {contratosVencidos.map((c) => (
-                <li key={c.id} className="flex items-center justify-between text-sm">
+                <li key={c.id} className="flex items-center justify-between gap-4 py-4 text-sm">
                   <div>
                     <Link to={`/contratos/${c.id}`} className="text-brand-700 hover:underline font-medium">
                       {imovelLabel(c.imoveis!, c)}
                     </Link>
-                    <p className="text-slate-500">Venceu em: {formatDate(c.vigencia_final)}</p>
+                    <p className="mt-1 text-xs text-slate-500">Venceu em: {formatDate(c.vigencia_final)}</p>
                   </div>
                   <Badge color="red">vencido</Badge>
                 </li>
@@ -164,17 +184,17 @@ export function DashboardPage() {
           )}
         </Card>
 
-        <Card className="p-5">
-          <h2 className="font-medium text-slate-900 mb-4">Visitas a agendar (aviso de 48h)</h2>
+        <Card className="overflow-hidden">
+          <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4"><span className="grid size-9 place-items-center rounded-xl bg-violet-50 text-violet-700"><CalendarClock size={18} /></span><div><h2 className="text-sm font-semibold text-slate-900">Visitas a agendar</h2><p className="text-xs text-slate-500">Avisos com 48 horas</p></div></div>
           {visitasAgendar.length > 0 ? (
-            <ul className="space-y-3">
+            <ul className="divide-y divide-slate-100 px-5">
               {visitasAgendar.map(({ contrato: c, proxima }) => (
-                <li key={c.id} className="flex items-center justify-between text-sm">
+                <li key={c.id} className="flex items-center justify-between gap-4 py-4 text-sm">
                   <div>
                     <Link to={`/contratos/${c.id}`} className="text-brand-700 hover:underline font-medium">
                       {imovelLabel(c.imoveis!, c)}
                     </Link>
-                    <p className="text-slate-500">Próxima visita: {formatDate(proxima)}</p>
+                    <p className="mt-1 text-xs text-slate-500">Próxima visita: {formatDate(proxima)}</p>
                   </div>
                   <Badge color={diffDiasISO(proxima, todayISO()) < 0 ? "red" : "yellow"}>
                     {diffDiasISO(proxima, todayISO()) < 0 ? "atrasada" : "avisar inquilino"}
@@ -187,17 +207,17 @@ export function DashboardPage() {
           )}
         </Card>
 
-        <Card className="p-5">
-          <h2 className="font-medium text-slate-900 mb-4">Vistoria de saída pendente</h2>
+        <Card className="overflow-hidden">
+          <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4"><span className="grid size-9 place-items-center rounded-xl bg-orange-50 text-orange-700"><House size={18} /></span><div><h2 className="text-sm font-semibold text-slate-900">Vistorias de saída</h2><p className="text-xs text-slate-500">Pendências após encerramento</p></div></div>
           {vistoriaSaidaPendente.length > 0 ? (
-            <ul className="space-y-3">
+            <ul className="divide-y divide-slate-100 px-5">
               {vistoriaSaidaPendente.map((c) => (
-                <li key={c.id} className="flex items-center justify-between text-sm">
+                <li key={c.id} className="flex items-center justify-between gap-4 py-4 text-sm">
                   <div>
                     <Link to={`/contratos/${c.id}`} className="text-brand-700 hover:underline font-medium">
                       {imovelLabel(c.imoveis!, c)}
                     </Link>
-                    <p className="text-slate-500">Contrato {c.status} {c.vigencia_final ? `· venceu em ${formatDate(c.vigencia_final)}` : ""}</p>
+                    <p className="mt-1 text-xs text-slate-500">Contrato {c.status} {c.vigencia_final ? `· venceu em ${formatDate(c.vigencia_final)}` : ""}</p>
                   </div>
                   <Badge color="red">sem vistoria de saída</Badge>
                 </li>
@@ -208,17 +228,17 @@ export function DashboardPage() {
           )}
         </Card>
 
-        <Card className="p-5">
-          <h2 className="font-medium text-slate-900 mb-4">Pagamentos pendentes/atrasados</h2>
+        <Card className="overflow-hidden">
+          <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4"><span className="grid size-9 place-items-center rounded-xl bg-amber-50 text-amber-700"><WalletCards size={18} /></span><div><h2 className="text-sm font-semibold text-slate-900">Pagamentos em aberto</h2><p className="text-xs text-slate-500">Pendentes e atrasados</p></div></div>
           {pagamentosPendentes.length > 0 ? (
-            <ul className="space-y-3">
+            <ul className="divide-y divide-slate-100 px-5">
               {pagamentosPendentes.map((p) => (
-                <li key={p.id} className="flex items-center justify-between text-sm">
+                <li key={p.id} className="flex items-center justify-between gap-4 py-4 text-sm">
                   <div>
                     <Link to={`/contratos/${p.contrato_id}`} className="text-brand-700 hover:underline font-medium">
                       {imovelLabel(p.contratos!.imoveis!, p.contratos)}
                     </Link>
-                    <p className="text-slate-500">Vencimento: {formatDate(p.data_vencimento)} · {formatBRL(p.valor)}</p>
+                    <p className="mt-1 text-xs text-slate-500">Vencimento: {formatDate(p.data_vencimento)} · {formatBRL(p.valor)}</p>
                   </div>
                   <Badge color={p.status === "atrasado" ? "red" : "yellow"}>{p.status}</Badge>
                 </li>
@@ -229,17 +249,17 @@ export function DashboardPage() {
           )}
         </Card>
 
-        <Card className="p-5">
-          <h2 className="font-medium text-slate-900 mb-4">Contas de água/energia pendentes</h2>
+        <Card className="overflow-hidden">
+          <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4"><span className="grid size-9 place-items-center rounded-xl bg-sky-50 text-sky-700"><Droplets size={18} /></span><div><h2 className="text-sm font-semibold text-slate-900">Contas de consumo</h2><p className="text-xs text-slate-500">Água e energia pendentes</p></div></div>
           {contasPendentes.length > 0 ? (
-            <ul className="space-y-3">
+            <ul className="divide-y divide-slate-100 px-5">
               {contasPendentes.map((c) => (
-                <li key={c.id} className="flex items-center justify-between text-sm">
+                <li key={c.id} className="flex items-center justify-between gap-4 py-4 text-sm">
                   <div>
                     <Link to={`/imoveis/${c.imovel_id}`} className="text-brand-700 hover:underline font-medium">
                       {imovelLabel(c.imoveis!)}
                     </Link>
-                    <p className="text-slate-500">{c.mes_referencia.slice(0, 7)}</p>
+                    <p className="mt-1 text-xs text-slate-500">{c.mes_referencia.slice(0, 7)}</p>
                   </div>
                   <Badge color="blue">{c.tipo}</Badge>
                 </li>

@@ -58,8 +58,8 @@ export function ImovelForm({
           </Select>
         </Field>
 
-        <div className="grid grid-cols-3 gap-4">
-          <div className="col-span-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="sm:col-span-2">
             <Field label="Rua" htmlFor="rua">
               <Input id="rua" name="rua" required defaultValue={defaultValues?.rua} />
             </Field>
@@ -69,7 +69,7 @@ export function ImovelForm({
           </Field>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label="Bairro" htmlFor="bairro">
             <Input id="bairro" name="bairro" defaultValue={defaultValues?.bairro ?? ""} />
           </Field>
@@ -85,7 +85,7 @@ export function ImovelForm({
           <Input id="cep" name="cep" defaultValue={defaultValues?.cep ?? ""} />
         </Field>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label="Tipo de operação" htmlFor="tipo_operacao">
             <Select id="tipo_operacao" name="tipo_operacao" defaultValue={defaultValues?.tipo_operacao ?? "aluguel"}>
               <option value="aluguel">Aluguel (taxa única)</option>

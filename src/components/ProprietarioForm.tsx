@@ -76,7 +76,7 @@ export function ProprietarioForm({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="CPF/CNPJ" htmlFor="cpf_cnpj">
             <Input id="cpf_cnpj" name="cpf_cnpj" defaultValue={defaultValues?.cpf_cnpj ?? ""} />
           </Field>
@@ -86,12 +86,12 @@ export function ProprietarioForm({
         </div>
 
         {tipoPessoa === "juridica" && (
-          <div className="border border-slate-200 rounded-md p-4 space-y-4 bg-slate-50">
+          <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
             <p className="text-xs font-medium text-slate-500 uppercase">Representante legal</p>
             <Field label="Nome do representante" htmlFor="representante_nome">
               <Input id="representante_nome" name="representante_nome" defaultValue={defaultValues?.representante_nome ?? ""} />
             </Field>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="CPF do representante" htmlFor="representante_cpf">
                 <Input id="representante_cpf" name="representante_cpf" defaultValue={defaultValues?.representante_cpf ?? ""} />
               </Field>
@@ -106,7 +106,7 @@ export function ProprietarioForm({
           <Input id="endereco" name="endereco" defaultValue={defaultValues?.endereco ?? ""} />
         </Field>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Telefone" htmlFor="telefone">
             <Input id="telefone" name="telefone" defaultValue={defaultValues?.telefone ?? ""} />
           </Field>
@@ -119,9 +119,9 @@ export function ProprietarioForm({
           <Input id="chave_pix" name="chave_pix" defaultValue={defaultValues?.chave_pix ?? ""} />
         </Field>
 
-        <div className="border border-slate-200 rounded-md p-4 space-y-4">
+        <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/40 p-4">
           <p className="text-xs font-medium text-slate-500 uppercase">Dados bancários (opcional, além do PIX)</p>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Banco" htmlFor="banco">
               <Input id="banco" name="banco" defaultValue={defaultValues?.banco ?? ""} />
             </Field>
@@ -129,7 +129,7 @@ export function ProprietarioForm({
               <Input id="agencia" name="agencia" defaultValue={defaultValues?.agencia ?? ""} />
             </Field>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Conta" htmlFor="conta">
               <Input id="conta" name="conta" defaultValue={defaultValues?.conta ?? ""} />
             </Field>

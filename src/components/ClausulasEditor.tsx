@@ -36,7 +36,7 @@ export function ClausulasEditor({
   return (
     <div className="space-y-4">
       {clausulas.map((clausula, idx) => (
-        <div key={clausula.id} className="border border-slate-200 rounded-md p-4 space-y-2 bg-white">
+        <div key={clausula.id} className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between">
             <Label htmlFor={`clausula-titulo-${clausula.id}`}>Cláusula {idx + 1} — título (opcional)</Label>
             <div className="flex gap-2">

@@ -1,9 +1,10 @@
 import { InputHTMLAttributes, LabelHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { Link } from "react-router-dom";
+import { Inbox, LoaderCircle, Plus } from "lucide-react";
 
 export function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`bg-white border border-slate-200 rounded-lg shadow-sm ${className}`}>
+    <div className={`surface-panel ${className}`}>
       {children}
     </div>
   );
@@ -17,13 +18,17 @@ export function PageHeader({
   action?: { href: string; label: string };
 }) {
   return (
-    <div className="flex items-center justify-between mb-6">
-      <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>
+    <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <p className="eyebrow mb-2">Gestão imobiliária</p>
+        <h1 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950 sm:text-[2rem]">{title}</h1>
+      </div>
       {action && (
         <Link
           to={action.href}
-          className="bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-md transition-colors"
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-brand-800 focus:outline-none focus:ring-4 focus:ring-brand-100"
         >
+          <Plus size={17} strokeWidth={2.2} />
           {action.label}
         </Link>
       )}
@@ -31,15 +36,15 @@ export function PageHeader({
   );
 }
 
-export function Label(props: LabelHTMLAttributes<HTMLLabelElement>) {
-  return <label {...props} className="block text-sm font-medium text-slate-700 mb-1" />;
+export function Label({ className = "", ...props }: LabelHTMLAttributes<HTMLLabelElement>) {
+  return <label {...props} className={`mb-1.5 block text-sm font-semibold text-slate-700 ${className}`} />;
 }
 
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className={`w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 ${props.className ?? ""}`}
+      className={`min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-brand-600 focus:ring-4 focus:ring-brand-100 disabled:bg-slate-50 disabled:text-slate-500 ${props.className ?? ""}`}
     />
   );
 }
@@ -48,7 +53,7 @@ export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
     <textarea
       {...props}
-      className={`w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 ${props.className ?? ""}`}
+      className={`w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-brand-600 focus:ring-4 focus:ring-brand-100 disabled:bg-slate-50 ${props.className ?? ""}`}
     />
   );
 }
@@ -57,7 +62,7 @@ export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
       {...props}
-      className={`w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 ${props.className ?? ""}`}
+      className={`min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition hover:border-slate-400 focus:border-brand-600 focus:ring-4 focus:ring-brand-100 disabled:bg-slate-50 ${props.className ?? ""}`}
     />
   );
 }
@@ -78,14 +83,14 @@ export function Button({
   ...props
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "danger" }) {
   const styles = {
-    primary: "bg-brand-600 hover:bg-brand-700 text-white",
-    secondary: "bg-white hover:bg-slate-50 text-slate-700 border border-slate-300",
-    danger: "bg-red-600 hover:bg-red-700 text-white",
+    primary: "bg-brand-700 hover:bg-brand-800 text-white shadow-sm focus:ring-brand-100",
+    secondary: "bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 focus:ring-slate-200",
+    danger: "bg-red-600 hover:bg-red-700 text-white focus:ring-red-100",
   };
   return (
     <button
       {...props}
-      className={`text-sm font-medium px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${styles[variant]} ${className}`}
+      className={`inline-flex min-h-10 items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold transition focus:outline-none focus:ring-4 disabled:cursor-not-allowed disabled:opacity-50 ${styles[variant]} ${className}`}
     >
       {children}
     </button>
@@ -94,14 +99,14 @@ export function Button({
 
 export function Badge({ children, color = "slate" }: { children: React.ReactNode; color?: "slate" | "green" | "yellow" | "red" | "blue" }) {
   const colors = {
-    slate: "bg-slate-100 text-slate-700",
-    green: "bg-green-100 text-green-700",
-    yellow: "bg-yellow-100 text-yellow-800",
-    red: "bg-red-100 text-red-700",
-    blue: "bg-blue-100 text-blue-700",
+    slate: "bg-slate-100 text-slate-700 ring-slate-200",
+    green: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+    yellow: "bg-amber-50 text-amber-700 ring-amber-200",
+    red: "bg-red-50 text-red-700 ring-red-200",
+    blue: "bg-sky-50 text-sky-700 ring-sky-200",
   };
   return (
-    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${colors[color]}`}>
+    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold capitalize ring-1 ring-inset ${colors[color]}`}>
       {children}
     </span>
   );
@@ -109,28 +114,33 @@ export function Badge({ children, color = "slate" }: { children: React.ReactNode
 
 export function Table({ children }: { children: React.ReactNode }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">{children}</table>
+    <div className="overflow-x-auto rounded-2xl">
+      <table className="w-full min-w-[640px] text-sm">{children}</table>
     </div>
   );
 }
 
 export function Th({ children }: { children: React.ReactNode }) {
-  return <th className="text-left font-medium text-slate-500 px-4 py-3 border-b border-slate-200">{children}</th>;
+  return <th className="border-b border-slate-200 bg-slate-50/80 px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">{children}</th>;
 }
 
 export function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <td className={`px-4 py-3 border-b border-slate-100 text-slate-800 ${className}`}>{children}</td>;
+  return <td className={`border-b border-slate-100 px-5 py-4 text-slate-700 ${className}`}>{children}</td>;
 }
 
 export function EmptyState({ message }: { message: string }) {
-  return <div className="text-center text-slate-500 py-12 text-sm">{message}</div>;
+  return (
+    <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
+      <span className="mb-3 grid size-11 place-items-center rounded-2xl bg-slate-100 text-slate-400"><Inbox size={20} /></span>
+      <p className="max-w-sm text-sm text-slate-500">{message}</p>
+    </div>
+  );
 }
 
 export function LoadingState() {
-  return <div className="text-center text-slate-400 py-12 text-sm">Carregando...</div>;
+  return <div className="flex items-center justify-center gap-2 py-14 text-sm text-slate-500"><LoaderCircle size={18} className="animate-spin" /> Carregando...</div>;
 }
 
 export function ErrorState({ message }: { message: string }) {
-  return <p className="text-sm text-red-600 mb-4">{message}</p>;
+  return <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-sm font-medium text-red-700">{message}</p>;
 }

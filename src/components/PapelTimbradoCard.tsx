@@ -66,7 +66,7 @@ export function PapelTimbradoCard() {
         </div>
       ) : url === null ? (
         <label className="inline-block">
-          <span className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-sm font-medium px-4 py-2 rounded-md cursor-pointer">
+          <span className="cursor-pointer rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
             {pending ? "Enviando..." : "Enviar papel timbrado"}
           </span>
           <input type="file" accept="image/png,image/jpeg" onChange={handleUpload} className="hidden" disabled={pending} />

@@ -76,7 +76,7 @@ export function PrestacaoContasListPage() {
     <div>
       <PageHeader title="Prestação de Contas" />
       <Card className="p-4 mb-6">
-        <div className="grid grid-cols-2 gap-4 max-w-lg">
+        <div className="grid max-w-lg grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Proprietário" htmlFor="proprietario">
             <Select id="proprietario" value={proprietarioId} onChange={(e) => setProprietarioId(e.target.value)}>
               {proprietarios.map((p) => (
@@ -96,7 +96,7 @@ export function PrestacaoContasListPage() {
         <LoadingState />
       ) : linhas.length > 0 ? (
         <>
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Card className="p-5">
               <p className="text-sm text-slate-500">Aluguel bruto recebido</p>
               <p className="text-2xl font-semibold text-slate-900 mt-1">{formatBRL(totalBruto)}</p>

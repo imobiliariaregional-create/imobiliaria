@@ -148,7 +148,7 @@ export function ImovelDetailPage() {
         <div>
           <h2 className="font-medium text-slate-900 mb-3">Água / Energia</h2>
           <Card className="p-4">
-            <form onSubmit={handleCriarConta} className="flex items-end gap-3 mb-4">
+            <form onSubmit={handleCriarConta} className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end">
               <Field label="Tipo" htmlFor="tipo">
                 <Select id="tipo" name="tipo">
                   {imovel.controla_agua && <option value="agua">Água</option>}
