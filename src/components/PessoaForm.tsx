@@ -4,11 +4,13 @@ import type { Pessoa } from "@/lib/types";
 import { DocumentoInput } from "@/components/DocumentoInput";
 import { getDraftValue, upper, upperOrNull, useFormDraft, validateCPFCNPJ } from "@/lib/forms";
 
+export type PessoaPayload = Omit<Pessoa, "id" | "created_at">;
+
 export function PessoaForm({
   onSubmit,
   defaultValues,
 }: {
-  onSubmit: (data: Omit<Pessoa, "id" | "created_at">) => Promise<void>;
+  onSubmit: (data: PessoaPayload) => Promise<void>;
   defaultValues?: Partial<Pessoa>;
 }) {
   const draftId = `pessoa:${defaultValues?.id ?? "nova"}`;

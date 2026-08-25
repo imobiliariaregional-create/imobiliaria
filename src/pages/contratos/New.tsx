@@ -3,8 +3,10 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { PageHeader, EmptyState, LoadingState } from "@/components/ui";
 import { ContratoForm, type ContratoPayload } from "@/components/ContratoForm";
+import type { ImovelPayload } from "@/components/ImovelForm";
+import type { PessoaPayload } from "@/components/PessoaForm";
 import { mapaContratosAtivosPorImovel } from "@/lib/imovelLabel";
-import type { Contrato, Imovel, Pessoa } from "@/lib/types";
+import type { Contrato, Imovel, Pessoa, Proprietario } from "@/lib/types";
 import { useAuth } from "@/lib/auth";
 
 export function NovoContratoPage() {
@@ -15,16 +17,19 @@ export function NovoContratoPage() {
 
   const [imoveis, setImoveis] = useState<Imovel[] | null>(null);
   const [pessoas, setPessoas] = useState<Pessoa[]>([]);
+  const [proprietarios, setProprietarios] = useState<Proprietario[]>([]);
   const [contratosAtivos, setContratosAtivos] = useState<Map<string, Contrato>>(new Map());
 
   useEffect(() => {
     Promise.all([
       supabase.from("imoveis").select("*").order("created_at", { ascending: false }).returns<Imovel[]>(),
       supabase.from("pessoas").select("*").order("nome").returns<Pessoa[]>(),
-    ]).then(async ([imoveisRes, pessoasRes]) => {
+      supabase.from("proprietarios").select("*").order("nome").returns<Proprietario[]>(),
+    ]).then(async ([imoveisRes, pessoasRes, proprietariosRes]) => {
       const imoveis = imoveisRes.data ?? [];
       setImoveis(imoveis);
       setPessoas(pessoasRes.data ?? []);
+      setProprietarios(proprietariosRes.data ?? []);
       setContratosAtivos(await mapaContratosAtivosPorImovel(imoveis.map((i) => i.id)));
     });
   }, []);
@@ -41,16 +46,22 @@ export function NovoContratoPage() {
     return <EmptyState message="Seu perfil possui acesso somente de leitura aos contratos." />;
   }
 
-  const imoveisDisponiveis = imoveis.filter((imovel) => imovel.status === "disponivel" && !contratosAtivos.has(imovel.id));
-
-  if (imoveisDisponiveis.length === 0) {
-    return (
-      <div>
-        <PageHeader title="Novo contrato" />
-        <EmptyState message="Não há imóveis disponíveis sem contrato ativo." />
-      </div>
-    );
+  async function handleCreateImovel(data: ImovelPayload) {
+    if (data.status !== "disponivel") throw new Error("Para usar o imóvel neste contrato, mantenha o status como disponível.");
+    const { data: created, error } = await supabase.from("imoveis").insert(data).select("*").single<Imovel>();
+    if (error) throw new Error(error.message);
+    setImoveis((current) => current ? [created, ...current] : [created]);
+    return created;
   }
+
+  async function handleCreatePessoa(data: PessoaPayload) {
+    const { data: created, error } = await supabase.from("pessoas").insert(data).select("*").single<Pessoa>();
+    if (error) throw new Error(error.message);
+    setPessoas((current) => [...current, created].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")));
+    return created;
+  }
+
+  const imoveisDisponiveis = imoveis.filter((imovel) => imovel.status === "disponivel" && !contratosAtivos.has(imovel.id));
 
   const imovelFixo = imovelIdParam ? imoveisDisponiveis.find((i) => i.id === imovelIdParam) : undefined;
 
@@ -62,8 +73,11 @@ export function NovoContratoPage() {
         mode="create"
         imoveis={imoveisDisponiveis}
         pessoas={pessoas}
+        proprietarios={proprietarios}
         imovelFixo={imovelFixo}
         contratosAtivosPorImovel={contratosAtivos}
+        onCreateImovel={handleCreateImovel}
+        onCreatePessoa={handleCreatePessoa}
       />
     </div>
   );

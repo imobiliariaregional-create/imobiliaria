@@ -34,6 +34,25 @@ export function isValidCEP(value: string) {
   return /^\d{5}-\d{3}$/.test(value);
 }
 
+export function parseBRLInput(value: string) {
+  const cleaned = value.replace(/[^\d,.-]/g, "").trim();
+  if (!cleaned) return null;
+
+  const comma = cleaned.lastIndexOf(",");
+  const dot = cleaned.lastIndexOf(".");
+  let normalized = cleaned;
+
+  if (comma >= 0) {
+    normalized = cleaned.replace(/\./g, "").replace(",", ".");
+  } else if (dot >= 0) {
+    const decimalPlaces = cleaned.length - dot - 1;
+    normalized = decimalPlaces === 3 ? cleaned.replace(/\./g, "") : cleaned;
+  }
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function calculateDigit(base: string, weights: number[]) {
   const total = base.split("").reduce((sum, digit, index) => sum + Number(digit) * weights[index], 0);
   const rest = total % 11;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatCEP, formatCNPJ, formatCPF, isValidCEP, isValidCNPJ, isValidCPF, normalizeSearch, upper } from "@/lib/forms";
+import { formatCEP, formatCNPJ, formatCPF, isValidCEP, isValidCNPJ, isValidCPF, normalizeSearch, parseBRLInput, upper } from "@/lib/forms";
 
 describe("documentos brasileiros", () => {
   it("formata e valida CPF", () => {
@@ -32,5 +32,14 @@ describe("CEP brasileiro", () => {
     expect(isValidCEP("68750-000")).toBe(true);
     expect(isValidCEP("68750000")).toBe(false);
     expect(isValidCEP("68750-00")).toBe(false);
+  });
+});
+
+describe("valor monetário brasileiro", () => {
+  it("interpreta reais digitados sem exigir centavos", () => {
+    expect(parseBRLInput("1000")).toBe(1000);
+    expect(parseBRLInput("R$ 1.000,00")).toBe(1000);
+    expect(parseBRLInput("1250,75")).toBe(1250.75);
+    expect(parseBRLInput("")).toBeNull();
   });
 });
