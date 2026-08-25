@@ -1,16 +1,24 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
-import { PageHeader, Card, Table, Th, Td, EmptyState, Badge, Button, LoadingState } from "@/components/ui";
+import { PageHeader, Card, Table, Th, Td, EmptyState, Badge, Button, LoadingState, TableToolbar } from "@/components/ui";
 import { formatMonth, todayISO } from "@/lib/format";
 import type { ContaConsumo } from "@/lib/types";
 import { useAuth } from "@/lib/auth";
+import { normalizeSearch } from "@/lib/forms";
+import { enderecoImovel } from "@/lib/imovelLabel";
 
 const tipoLabel: Record<string, string> = { agua: "Água", energia: "Energia" };
 
 export function ContasConsumoListPage() {
   const { papel } = useAuth();
   const [data, setData] = useState<ContaConsumo[] | null>(null);
+  const [search, setSearch] = useState("");
+  const [tipo, setTipo] = useState("");
+  const filtered = useMemo(() => (data ?? []).filter((item) => {
+    const haystack = normalizeSearch([item.imoveis ? enderecoImovel(item.imoveis) : "", item.status_pagamento, item.mes_referencia].join(" "));
+    return (!tipo || item.tipo === tipo) && haystack.includes(normalizeSearch(search));
+  }), [data, search, tipo]);
 
   async function reload() {
     const { data } = await supabase
@@ -44,10 +52,11 @@ export function ContasConsumoListPage() {
       <p className="text-sm text-slate-500 -mt-4 mb-6">
         Contas são cadastradas a partir da página de cada imóvel.
       </p>
+      <TableToolbar search={search} onSearch={setSearch} total={data?.length ?? 0} shown={filtered.length} filter={tipo} onFilter={setTipo} options={Object.entries(tipoLabel).map(([value, label]) => ({ value, label }))} />
       <Card>
         {data === null ? (
           <LoadingState />
-        ) : data.length > 0 ? (
+        ) : filtered.length > 0 ? (
           <Table>
             <thead>
               <tr>
@@ -59,11 +68,11 @@ export function ContasConsumoListPage() {
               </tr>
             </thead>
             <tbody>
-              {data.map((c) => (
+              {filtered.map((c) => (
                 <tr key={c.id} className="hover:bg-slate-50">
                   <Td>
                     <Link to={`/imoveis/${c.imovel_id}`} className="text-brand-700 hover:underline font-medium">
-                      {c.imoveis?.rua}, {c.imoveis?.numero}
+                      {c.imoveis ? enderecoImovel(c.imoveis) : "-"}
                     </Link>
                   </Td>
                   <Td>{tipoLabel[c.tipo]}</Td>
@@ -83,7 +92,7 @@ export function ContasConsumoListPage() {
             </tbody>
           </Table>
         ) : (
-          <EmptyState message="Nenhuma conta de água/energia cadastrada ainda." />
+          <EmptyState message={data.length ? "Nenhuma conta corresponde aos filtros." : "Nenhuma conta de água/energia cadastrada ainda."} />
         )}
       </Card>
     </div>

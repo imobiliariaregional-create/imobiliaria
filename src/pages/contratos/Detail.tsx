@@ -8,6 +8,7 @@ import { imovelLabel, mapaContratosAtivosPorImovel } from "@/lib/imovelLabel";
 import type { Contrato, Imovel, Pessoa, PagamentoMensal, LaudoVistoria, NotaFiscal } from "@/lib/types";
 import { confirmDeletion } from "@/lib/actions";
 import { useAuth } from "@/lib/auth";
+import { upperOrNull, useFormDraft } from "@/lib/forms";
 
 const tipoLabel: Record<string, string> = {
   aluguel: "Aluguel",
@@ -27,6 +28,7 @@ export function ContratoDetailPage() {
   const [pessoas, setPessoas] = useState<Pessoa[]>([]);
   const [laudoUrls, setLaudoUrls] = useState<Record<string, string>>({});
   const [notaUrls, setNotaUrls] = useState<Record<string, string>>({});
+  const laudoDraft = useFormDraft(`laudo:${id ?? "novo"}`);
 
   async function reload() {
     const [contratoRes, pagamentosRes, laudosRes, notasRes, pessoasRes] = await Promise.all([
@@ -138,7 +140,7 @@ export function ContratoDetailPage() {
     const formData = new FormData(e.currentTarget);
     const tipo = String(formData.get("tipo"));
     const data = String(formData.get("data"));
-    const observacoes = (formData.get("observacoes") as string) || null;
+    const observacoes = upperOrNull(formData.get("observacoes"));
     const arquivo = formData.get("arquivo") as File | null;
 
     let arquivo_url: string | null = null;
@@ -166,6 +168,7 @@ export function ContratoDetailPage() {
       alert(error.message);
       return;
     }
+    laudoDraft.clearDraft();
     e.currentTarget.reset();
     reload();
   }
@@ -286,7 +289,7 @@ export function ContratoDetailPage() {
         <h2 className="font-medium text-slate-900 mb-3">Laudos de vistoria</h2>
         <Card className="p-4">
           {(papel === "admin" || papel === "corretor") && (
-            <form onSubmit={handleCriarLaudo} className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <form ref={laudoDraft.formRef} onSubmit={handleCriarLaudo} onInput={laudoDraft.saveDraft} onChange={laudoDraft.saveDraft} className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Tipo" htmlFor="tipo_laudo">
                 <Select id="tipo_laudo" name="tipo">
                   <option value="entrada">Entrada</option>

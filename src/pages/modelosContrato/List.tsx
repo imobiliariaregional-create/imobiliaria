@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
-import { PageHeader, Card, Table, Th, Td, EmptyState, Badge, LoadingState } from "@/components/ui";
+import { PageHeader, Card, Table, Th, Td, EmptyState, Badge, LoadingState, TableToolbar } from "@/components/ui";
 import { PapelTimbradoCard } from "@/components/PapelTimbradoCard";
 import type { ModeloContrato } from "@/lib/types";
 import { useAuth } from "@/lib/auth";
+import { normalizeSearch } from "@/lib/forms";
 
 const tipoLabel: Record<string, string> = {
   aluguel: "Aluguel",
@@ -15,6 +16,11 @@ const tipoLabel: Record<string, string> = {
 export function ModelosContratoListPage() {
   const { papel } = useAuth();
   const [data, setData] = useState<ModeloContrato[] | null>(null);
+  const [search, setSearch] = useState("");
+  const [tipo, setTipo] = useState("");
+  const filtered = useMemo(() => (data ?? []).filter((item) => (
+    (!tipo || item.tipo_operacao === tipo) && normalizeSearch(item.nome).includes(normalizeSearch(search))
+  )), [data, search, tipo]);
 
   useEffect(() => {
     supabase
@@ -29,10 +35,11 @@ export function ModelosContratoListPage() {
     <div>
       <PageHeader title="Modelos de Contrato" action={papel === "admin" || papel === "corretor" ? { href: "/modelos-contrato/novo", label: "Novo modelo" } : undefined} />
       <PapelTimbradoCard />
+      <TableToolbar search={search} onSearch={setSearch} total={data?.length ?? 0} shown={filtered.length} filter={tipo} onFilter={setTipo} options={Object.entries(tipoLabel).map(([value, label]) => ({ value, label }))} />
       <Card>
         {data === null ? (
           <LoadingState />
-        ) : data.length > 0 ? (
+        ) : filtered.length > 0 ? (
           <Table>
             <thead>
               <tr>
@@ -42,7 +49,7 @@ export function ModelosContratoListPage() {
               </tr>
             </thead>
             <tbody>
-              {data.map((modelo) => (
+              {filtered.map((modelo) => (
                 <tr key={modelo.id} className="hover:bg-slate-50">
                   <Td>
                     <Link to={`/modelos-contrato/${modelo.id}`} className="text-brand-700 hover:underline font-medium">
@@ -58,7 +65,7 @@ export function ModelosContratoListPage() {
             </tbody>
           </Table>
         ) : (
-          <EmptyState message="Nenhum modelo de contrato cadastrado ainda." />
+          <EmptyState message={data.length ? "Nenhum modelo corresponde aos filtros." : "Nenhum modelo de contrato cadastrado ainda."} />
         )}
       </Card>
     </div>

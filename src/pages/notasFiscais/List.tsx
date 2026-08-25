@@ -1,21 +1,32 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
-import { PageHeader, Card, Table, Th, Td, EmptyState, Button, LoadingState } from "@/components/ui";
+import { PageHeader, Card, Table, Th, Td, EmptyState, Button, LoadingState, TableToolbar } from "@/components/ui";
 import { formatBRL, formatDate } from "@/lib/format";
 import type { NotaFiscal } from "@/lib/types";
 import { confirmDeletion } from "@/lib/actions";
 import { useAuth } from "@/lib/auth";
+import { normalizeSearch } from "@/lib/forms";
+import { enderecoImovel } from "@/lib/imovelLabel";
+
+const tipoLabel = { aluguel: "Aluguel", administracao: "Administração", venda: "Venda", avulsa: "Sem contrato" };
 
 export function NotasFiscaisListPage() {
   const { papel } = useAuth();
   const [data, setData] = useState<NotaFiscal[] | null>(null);
   const [urls, setUrls] = useState<Record<string, string>>({});
+  const [search, setSearch] = useState("");
+  const [tipo, setTipo] = useState("");
+  const filtered = useMemo(() => (data ?? []).filter((item) => {
+    const itemTipo = item.contratos?.tipo ?? "avulsa";
+    const haystack = normalizeSearch([item.numero, item.descricao, item.contratos?.pessoas?.nome, item.contratos?.imoveis ? enderecoImovel(item.contratos.imoveis) : ""].join(" "));
+    return (!tipo || itemTipo === tipo) && haystack.includes(normalizeSearch(search));
+  }), [data, search, tipo]);
 
   async function reload() {
     const { data } = await supabase
       .from("notas_fiscais")
-      .select("*, contratos(*, imoveis(*))")
+      .select("*, contratos(*, imoveis(*), pessoas(*))")
       .order("data_emissao", { ascending: false })
       .returns<NotaFiscal[]>();
     setData(data ?? []);
@@ -56,10 +67,11 @@ export function NotasFiscaisListPage() {
     <div>
       <PageHeader title="Notas Fiscais" action={papel === "admin" || papel === "financeiro" ? { href: "/notas-fiscais/nova", label: "Nova nota fiscal" } : undefined} />
       <p className="text-sm text-slate-500 -mt-4 mb-6">Total registrado: {formatBRL(totalGeral)}</p>
+      <TableToolbar search={search} onSearch={setSearch} total={data?.length ?? 0} shown={filtered.length} filter={tipo} onFilter={setTipo} options={Object.entries(tipoLabel).map(([value, label]) => ({ value, label }))} />
       <Card>
         {data === null ? (
           <LoadingState />
-        ) : data.length > 0 ? (
+        ) : filtered.length > 0 ? (
           <Table>
             <thead>
               <tr>
@@ -72,7 +84,7 @@ export function NotasFiscaisListPage() {
               </tr>
             </thead>
             <tbody>
-              {data.map((nota) => (
+              {filtered.map((nota) => (
                 <tr key={nota.id} className="hover:bg-slate-50">
                   <Td>{nota.numero ?? "-"}</Td>
                   <Td>{formatBRL(nota.valor)}</Td>
@@ -80,7 +92,7 @@ export function NotasFiscaisListPage() {
                   <Td>
                     {nota.contrato_id ? (
                       <Link to={`/contratos/${nota.contrato_id}`} className="text-brand-700 hover:underline">
-                        {nota.contratos?.imoveis?.rua}, {nota.contratos?.imoveis?.numero}
+                        {nota.contratos?.imoveis ? enderecoImovel(nota.contratos.imoveis) : "-"}
                       </Link>
                     ) : (
                       "-"
@@ -103,7 +115,7 @@ export function NotasFiscaisListPage() {
             </tbody>
           </Table>
         ) : (
-          <EmptyState message="Nenhuma nota fiscal cadastrada ainda." />
+          <EmptyState message={data.length ? "Nenhuma nota fiscal corresponde aos filtros." : "Nenhuma nota fiscal cadastrada ainda."} />
         )}
       </Card>
     </div>

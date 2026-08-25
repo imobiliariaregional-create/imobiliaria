@@ -8,6 +8,7 @@ import { imovelLabel, enderecoImovel } from "@/lib/imovelLabel";
 import type { Imovel, Proprietario, Contrato, ContaConsumo } from "@/lib/types";
 import { confirmDeletion } from "@/lib/actions";
 import { useAuth } from "@/lib/auth";
+import { useFormDraft } from "@/lib/forms";
 
 export function ImovelDetailPage() {
   const { papel } = useAuth();
@@ -18,6 +19,7 @@ export function ImovelDetailPage() {
   const [proprietarios, setProprietarios] = useState<Proprietario[]>([]);
   const [contratos, setContratos] = useState<Contrato[]>([]);
   const [contas, setContas] = useState<ContaConsumo[]>([]);
+  const contaDraft = useFormDraft(`conta-consumo:${id ?? "novo"}`);
 
   async function reload() {
     const [imovelRes, proprietariosRes, contratosRes, contasRes] = await Promise.all([
@@ -81,6 +83,7 @@ export function ImovelDetailPage() {
       alert(error.message);
       return;
     }
+    contaDraft.clearDraft();
     e.currentTarget.reset();
     reload();
   }
@@ -163,7 +166,7 @@ export function ImovelDetailPage() {
         <div>
           <h2 className="font-medium text-slate-900 mb-3">Água / Energia</h2>
           <Card className="p-4">
-            {(papel === "admin" || papel === "financeiro") && <form onSubmit={handleCriarConta} className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+            {(papel === "admin" || papel === "financeiro") && <form ref={contaDraft.formRef} onSubmit={handleCriarConta} onInput={contaDraft.saveDraft} onChange={contaDraft.saveDraft} className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end">
               <Field label="Tipo" htmlFor="tipo">
                 <Select id="tipo" name="tipo">
                   {imovel.controla_agua && <option value="agua">Água</option>}

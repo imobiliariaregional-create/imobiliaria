@@ -19,11 +19,17 @@ export async function mapaContratosAtivosPorImovel(imovelIds: string[]): Promise
   return map;
 }
 
-export function enderecoImovel(imovel: Pick<Imovel, "rua" | "numero">): string {
-  return imovel.numero ? `${imovel.rua}, ${imovel.numero}` : imovel.rua;
+export function enderecoImovel(imovel: Pick<Imovel, "rua" | "numero" | "bairro" | "complemento" | "cidade" | "uf" | "cep">): string {
+  return [
+    [imovel.rua, imovel.numero].filter(Boolean).join(", "),
+    imovel.bairro,
+    imovel.complemento,
+    [imovel.cidade, imovel.uf].filter(Boolean).join("/") || null,
+    imovel.cep ? `CEP ${imovel.cep}` : null,
+  ].filter(Boolean).join(" · ");
 }
 
 /** Nome do inquilino/comprador do contrato ativo, ou endereço como alternativa (imóvel vago). */
-export function imovelLabel(imovel: Pick<Imovel, "rua" | "numero">, contratoAtivo?: Contrato | null): string {
+export function imovelLabel(imovel: Pick<Imovel, "rua" | "numero" | "bairro" | "complemento" | "cidade" | "uf" | "cep">, contratoAtivo?: Contrato | null): string {
   return contratoAtivo?.pessoas?.nome || enderecoImovel(imovel);
 }

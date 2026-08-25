@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
-import { PageHeader, Card, Table, Th, Td, EmptyState, Badge, Button, LoadingState } from "@/components/ui";
+import { PageHeader, Card, Table, Th, Td, EmptyState, Badge, Button, LoadingState, TableToolbar } from "@/components/ui";
 import { formatBRL, formatDate, formatMonth, todayISO } from "@/lib/format";
 import type { PagamentoMensal } from "@/lib/types";
 import { useAuth } from "@/lib/auth";
+import { normalizeSearch } from "@/lib/forms";
+import { enderecoImovel } from "@/lib/imovelLabel";
 
 const tipoLabel: Record<string, string> = {
   aluguel: "Aluguel",
@@ -15,12 +17,19 @@ const tipoLabel: Record<string, string> = {
 export function PagamentosListPage() {
   const { papel } = useAuth();
   const [data, setData] = useState<PagamentoMensal[] | null>(null);
+  const [search, setSearch] = useState("");
+  const [tipo, setTipo] = useState("");
   const hoje = todayISO();
+  const filtered = useMemo(() => (data ?? []).filter((item) => {
+    const contrato = item.contratos;
+    const haystack = normalizeSearch([contrato?.pessoas?.nome, contrato?.imoveis ? enderecoImovel(contrato.imoveis) : "", item.status, item.mes_referencia].join(" "));
+    return (!tipo || contrato?.tipo === tipo) && haystack.includes(normalizeSearch(search));
+  }), [data, search, tipo]);
 
   async function reload() {
     const { data } = await supabase
       .from("pagamentos_mensais")
-      .select("*, contratos(*, imoveis(*))")
+      .select("*, contratos(*, imoveis(*), pessoas(*))")
       .order("mes_referencia", { ascending: false })
       .returns<PagamentoMensal[]>();
     setData(data ?? []);
@@ -50,14 +59,16 @@ export function PagamentosListPage() {
   return (
     <div>
       <PageHeader title="Pagamentos (valores a receber pela imobiliária)" />
+      <TableToolbar search={search} onSearch={setSearch} total={data?.length ?? 0} shown={filtered.length} filter={tipo} onFilter={setTipo} options={Object.entries(tipoLabel).map(([value, label]) => ({ value, label }))} />
       <Card>
         {data === null ? (
           <LoadingState />
-        ) : data.length > 0 ? (
+        ) : filtered.length > 0 ? (
           <Table>
             <thead>
               <tr>
-                <Th>Imóvel</Th>
+                <Th>Locatário / comprador</Th>
+                <Th>Endereço do imóvel</Th>
                 <Th>Tipo</Th>
                 <Th>Mês</Th>
                 <Th>Valor</Th>
@@ -67,13 +78,18 @@ export function PagamentosListPage() {
               </tr>
             </thead>
             <tbody>
-              {data.map((p) => {
+              {filtered.map((p) => {
                 const atrasado = p.status === "pendente" && p.data_vencimento < hoje;
                 return (
                   <tr key={p.id} className="hover:bg-slate-50">
                     <Td>
                       <Link to={`/contratos/${p.contrato_id}`} className="text-brand-700 hover:underline font-medium">
-                        {p.contratos?.imoveis?.rua}, {p.contratos?.imoveis?.numero}
+                        {p.contratos?.pessoas?.nome ?? "-"}
+                      </Link>
+                    </Td>
+                    <Td>
+                      <Link to={`/contratos/${p.contrato_id}`} className="text-brand-700 hover:underline font-medium">
+                        {p.contratos?.imoveis ? enderecoImovel(p.contratos.imoveis) : "-"}
                       </Link>
                     </Td>
                     <Td>{p.contratos ? tipoLabel[p.contratos.tipo] : "-"}</Td>
@@ -101,7 +117,7 @@ export function PagamentosListPage() {
             </tbody>
           </Table>
         ) : (
-          <EmptyState message="Nenhum pagamento gerado ainda. Crie um contrato para começar." />
+          <EmptyState message={data.length ? "Nenhum pagamento corresponde aos filtros." : "Nenhum pagamento gerado ainda. Crie um contrato para começar."} />
         )}
       </Card>
     </div>

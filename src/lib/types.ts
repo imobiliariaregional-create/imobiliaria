@@ -60,6 +60,7 @@ export interface Imovel {
   rua: string;
   numero: string | null;
   bairro: string | null;
+  complemento: string | null;
   cidade: string | null;
   uf: string | null;
   cep: string | null;

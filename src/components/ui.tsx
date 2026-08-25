@@ -1,6 +1,6 @@
 import { InputHTMLAttributes, LabelHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { Link } from "react-router-dom";
-import { Inbox, LoaderCircle, Plus } from "lucide-react";
+import { Inbox, LoaderCircle, Plus, Search } from "lucide-react";
 
 export function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
@@ -41,18 +41,31 @@ export function Label({ className = "", ...props }: LabelHTMLAttributes<HTMLLabe
 }
 
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
+  const { onInput, ...inputProps } = props;
+  const uppercase = !["date", "datetime-local", "email", "file", "month", "number", "password", "time"].includes(props.type ?? "text");
   return (
     <input
-      {...props}
+      {...inputProps}
+      autoCapitalize={uppercase ? "characters" : props.autoCapitalize}
+      onInput={(event) => {
+        if (uppercase) event.currentTarget.value = event.currentTarget.value.toLocaleUpperCase("pt-BR");
+        onInput?.(event);
+      }}
       className={`min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-brand-600 focus:ring-4 focus:ring-brand-100 disabled:bg-slate-50 disabled:text-slate-500 ${props.className ?? ""}`}
     />
   );
 }
 
 export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  const { onInput, ...textareaProps } = props;
   return (
     <textarea
-      {...props}
+      {...textareaProps}
+      autoCapitalize="characters"
+      onInput={(event) => {
+        event.currentTarget.value = event.currentTarget.value.toLocaleUpperCase("pt-BR");
+        onInput?.(event);
+      }}
       className={`w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-brand-600 focus:ring-4 focus:ring-brand-100 disabled:bg-slate-50 ${props.className ?? ""}`}
     />
   );
@@ -133,6 +146,54 @@ export function EmptyState({ message }: { message: string }) {
     <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
       <span className="mb-3 grid size-11 place-items-center rounded-2xl bg-slate-100 text-slate-400"><Inbox size={20} /></span>
       <p className="max-w-sm text-sm text-slate-500">{message}</p>
+    </div>
+  );
+}
+
+export function TableToolbar({
+  search,
+  onSearch,
+  total,
+  shown,
+  filter,
+  onFilter,
+  filterLabel = "Tipo",
+  options = [],
+}: {
+  search: string;
+  onSearch: (value: string) => void;
+  total: number;
+  shown: number;
+  filter?: string;
+  onFilter?: (value: string) => void;
+  filterLabel?: string;
+  options?: Array<{ value: string; label: string }>;
+}) {
+  return (
+    <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-end">
+      <div className="relative flex-1">
+        <Search size={17} className="pointer-events-none absolute left-3 top-3.5 text-slate-400" />
+        <Input
+          type="search"
+          aria-label="Pesquisar na tabela"
+          placeholder="PESQUISAR..."
+          value={search}
+          onChange={(event) => onSearch(event.target.value)}
+          className="pl-10"
+        />
+      </div>
+      {onFilter && options.length > 0 && (
+        <div className="sm:w-56">
+          <Label htmlFor="table-filter" className="sr-only">{filterLabel}</Label>
+          <Select id="table-filter" aria-label={`Filtrar por ${filterLabel}`} value={filter ?? ""} onChange={(event) => onFilter(event.target.value)}>
+            <option value="">Todos</option>
+            {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </Select>
+        </div>
+      )}
+      <p className="whitespace-nowrap px-2 pb-2 text-sm font-medium text-slate-600">
+        Total: <span className="text-slate-950">{total}</span>{shown !== total && <span className="text-slate-400"> · Exibindo {shown}</span>}
+      </p>
     </div>
   );
 }

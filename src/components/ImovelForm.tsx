@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import { Card, Field, Input, Select, Textarea, Button, Label, ErrorState } from "@/components/ui";
 import type { Imovel, Proprietario } from "@/lib/types";
+import { upper, upperOrNull, useFormDraft } from "@/lib/forms";
 
 export type ImovelPayload = Omit<Imovel, "id" | "created_at" | "proprietarios">;
 
@@ -15,6 +16,7 @@ export function ImovelForm({
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { formRef, saveDraft, clearDraft } = useFormDraft(`imovel:${defaultValues?.id ?? "novo"}`);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -24,29 +26,32 @@ export function ImovelForm({
     try {
       await onSubmit({
         proprietario_id: (formData.get("proprietario_id") as string) || null,
-        rua: String(formData.get("rua") ?? ""),
-        numero: (formData.get("numero") as string) || null,
-        bairro: (formData.get("bairro") as string) || null,
-        cidade: (formData.get("cidade") as string) || null,
-        uf: (formData.get("uf") as string) || null,
+        rua: upper(formData.get("rua")),
+        numero: upperOrNull(formData.get("numero")),
+        bairro: upperOrNull(formData.get("bairro")),
+        complemento: upperOrNull(formData.get("complemento")),
+        cidade: upperOrNull(formData.get("cidade")),
+        uf: upperOrNull(formData.get("uf")),
         cep: (formData.get("cep") as string) || null,
         tipo_operacao: String(formData.get("tipo_operacao") ?? "aluguel") as Imovel["tipo_operacao"],
         tipo_imovel: String(formData.get("tipo_imovel") ?? "residencial") as Imovel["tipo_imovel"],
-        descricao: (formData.get("descricao") as string) || null,
+        descricao: upperOrNull(formData.get("descricao")),
         controla_agua: formData.get("controla_agua") === "on",
         controla_energia: formData.get("controla_energia") === "on",
         status: String(formData.get("status") ?? "disponivel") as Imovel["status"],
-        observacoes: (formData.get("observacoes") as string) || null,
+        observacoes: upperOrNull(formData.get("observacoes")),
       });
+      clearDraft();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao salvar.");
+    } finally {
       setPending(false);
     }
   }
 
   return (
     <Card className="p-6 max-w-2xl">
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form ref={formRef} onSubmit={handleSubmit} onInput={saveDraft} onChange={saveDraft} className="space-y-4">
         <Field label="Proprietário" htmlFor="proprietario_id">
           <Select id="proprietario_id" name="proprietario_id" defaultValue={defaultValues?.proprietario_id ?? ""}>
             <option value="">Selecione...</option>
@@ -60,7 +65,7 @@ export function ImovelForm({
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="sm:col-span-2">
-            <Field label="Rua" htmlFor="rua">
+            <Field label="Logradouro" htmlFor="rua">
               <Input id="rua" name="rua" required defaultValue={defaultValues?.rua} />
             </Field>
           </div>
@@ -69,21 +74,26 @@ export function ImovelForm({
           </Field>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Bairro" htmlFor="bairro">
             <Input id="bairro" name="bairro" defaultValue={defaultValues?.bairro ?? ""} />
           </Field>
-          <Field label="Cidade" htmlFor="cidade">
-            <Input id="cidade" name="cidade" defaultValue={defaultValues?.cidade ?? ""} />
-          </Field>
-          <Field label="UF" htmlFor="uf">
-            <Input id="uf" name="uf" maxLength={2} defaultValue={defaultValues?.uf ?? ""} />
+          <Field label="Complemento" htmlFor="complemento">
+            <Input id="complemento" name="complemento" defaultValue={defaultValues?.complemento ?? ""} placeholder="EX.: APTO 02, FUNDOS" />
           </Field>
         </div>
 
-        <Field label="CEP" htmlFor="cep">
-          <Input id="cep" name="cep" defaultValue={defaultValues?.cep ?? ""} />
-        </Field>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <Field label="Cidade" htmlFor="cidade">
+            <Input id="cidade" name="cidade" defaultValue={defaultValues?.cidade ?? ""} />
+          </Field>
+          <Field label="Estado (UF)" htmlFor="uf">
+            <Input id="uf" name="uf" maxLength={2} defaultValue={defaultValues?.uf ?? ""} />
+          </Field>
+          <Field label="CEP" htmlFor="cep">
+            <Input id="cep" name="cep" inputMode="numeric" maxLength={9} defaultValue={defaultValues?.cep ?? ""} />
+          </Field>
+        </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label="Tipo de operação" htmlFor="tipo_operacao">

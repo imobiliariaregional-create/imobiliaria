@@ -5,6 +5,7 @@ import { PageHeader, Card, Field, Input, Select, Textarea, Button, ErrorState, L
 import { todayISO } from "@/lib/format";
 import type { Contrato } from "@/lib/types";
 import { useAuth } from "@/lib/auth";
+import { upperOrNull, useFormDraft } from "@/lib/forms";
 
 export function NovaNotaFiscalPage() {
   const { papel, perfilLoading } = useAuth();
@@ -15,6 +16,7 @@ export function NovaNotaFiscalPage() {
   const [contratos, setContratos] = useState<Contrato[] | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { formRef, saveDraft, clearDraft } = useFormDraft("nota-fiscal:nova");
 
   useEffect(() => {
     supabase
@@ -31,10 +33,10 @@ export function NovaNotaFiscalPage() {
     setError(null);
     const formData = new FormData(e.currentTarget);
 
-    const numero = (formData.get("numero") as string) || null;
+    const numero = upperOrNull(formData.get("numero"));
     const valor = Number(formData.get("valor"));
     const data_emissao = String(formData.get("data_emissao"));
-    const descricao = (formData.get("descricao") as string) || null;
+    const descricao = upperOrNull(formData.get("descricao"));
     const contrato_id = (formData.get("contrato_id") as string) || null;
     const arquivo = formData.get("arquivo") as File | null;
 
@@ -62,9 +64,11 @@ export function NovaNotaFiscalPage() {
         throw new Error(error.message);
       }
 
+      clearDraft();
       navigate("/notas-fiscais");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao salvar.");
+    } finally {
       setPending(false);
     }
   }
@@ -78,7 +82,7 @@ export function NovaNotaFiscalPage() {
     <div>
       <PageHeader title="Nova nota fiscal" />
       <Card className="p-6 max-w-xl">
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form ref={formRef} onSubmit={handleSubmit} onInput={saveDraft} onChange={saveDraft} className="space-y-4">
           <Field label="Número da nota" htmlFor="numero">
             <Input id="numero" name="numero" />
           </Field>

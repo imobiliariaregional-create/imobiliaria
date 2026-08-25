@@ -13,6 +13,7 @@ import type { ClausulaDocumento, Contrato, ContratoGerado, ModeloContrato } from
 
 export function ContratoDocumentoPage() {
   const { id } = useParams<{ id: string }>();
+  const draftKey = `form-draft:contrato-documento:${id ?? "novo"}`;
 
   const [contrato, setContrato] = useState<Contrato | null | undefined>(undefined);
   const [modelos, setModelos] = useState<ModeloContrato[]>([]);
@@ -34,7 +35,15 @@ export function ContratoDocumentoPage() {
     ]);
     setContrato(contratoRes.data);
     setGerado(geradoRes.data ?? null);
-    if (geradoRes.data) setClausulas(geradoRes.data.clausulas);
+    if (geradoRes.data) {
+      try {
+        const draft = sessionStorage.getItem(draftKey);
+        setClausulas(draft ? JSON.parse(draft) : geradoRes.data.clausulas);
+      } catch {
+        sessionStorage.removeItem(draftKey);
+        setClausulas(geradoRes.data.clausulas);
+      }
+    }
 
     if (contratoRes.data) {
       const { data: modelosData } = await supabase
@@ -83,6 +92,7 @@ export function ContratoDocumentoPage() {
       if (error) throw new Error(error.message);
       setGerado(data);
       setClausulas(data.clausulas);
+      sessionStorage.removeItem(draftKey);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao gerar documento.");
     } finally {
@@ -94,9 +104,20 @@ export function ContratoDocumentoPage() {
     if (!gerado) return;
     setPending(true);
     setError(null);
-    const { error } = await supabase.from("contratos_gerados").update({ clausulas }).eq("id", gerado.id);
-    setPending(false);
-    if (error) setError(error.message);
+    try {
+      const { error } = await supabase.from("contratos_gerados").update({ clausulas }).eq("id", gerado.id);
+      if (error) throw new Error(error.message);
+      sessionStorage.removeItem(draftKey);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao salvar alterações.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  function handleClausulasChange(next: ClausulaDocumento[]) {
+    setClausulas(next);
+    sessionStorage.setItem(draftKey, JSON.stringify(next));
   }
 
   async function exportarPDF() {
@@ -287,7 +308,7 @@ export function ContratoDocumentoPage() {
 
           <div className="print:hidden">
             <p className="text-sm font-medium text-slate-700 mb-2">Editar cláusulas</p>
-            <ClausulasEditor clausulas={clausulas} onChange={setClausulas} />
+            <ClausulasEditor clausulas={clausulas} onChange={handleClausulasChange} />
           </div>
 
           <div>

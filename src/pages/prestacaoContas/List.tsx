@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
-import { PageHeader, Card, Table, Th, Td, EmptyState, Badge, Button, Field, Select, Input, LoadingState } from "@/components/ui";
+import { PageHeader, Card, Table, Th, Td, EmptyState, Badge, Button, Field, Select, Input, LoadingState, TableToolbar } from "@/components/ui";
 import { formatBRL, formatMonth, todayISO } from "@/lib/format";
 import type { Proprietario, PagamentoMensal } from "@/lib/types";
 import { useAuth } from "@/lib/auth";
+import { normalizeSearch } from "@/lib/forms";
+import { enderecoImovel } from "@/lib/imovelLabel";
 
 function mesAtualISO() {
   return todayISO().slice(0, 7);
@@ -16,6 +18,13 @@ export function PrestacaoContasListPage() {
   const [proprietarioId, setProprietarioId] = useState<string>("");
   const [mes, setMes] = useState<string>(mesAtualISO());
   const [linhas, setLinhas] = useState<PagamentoMensal[] | null>(null);
+  const [search, setSearch] = useState("");
+  const [tipo, setTipo] = useState("");
+  const filtered = useMemo(() => (linhas ?? []).filter((item) => {
+    const repassado = item.valor_repassado !== null ? "repassado" : "pendente";
+    const haystack = normalizeSearch([item.contratos?.pessoas?.nome, item.contratos?.imoveis ? enderecoImovel(item.contratos.imoveis) : "", repassado].join(" "));
+    return (!tipo || repassado === tipo) && haystack.includes(normalizeSearch(search));
+  }), [linhas, search, tipo]);
 
   useEffect(() => {
     supabase
@@ -35,7 +44,7 @@ export function PrestacaoContasListPage() {
     setLinhas(null);
     const { data, error } = await supabase
       .from("pagamentos_mensais")
-      .select("*, contratos!inner(*, imoveis!inner(*, proprietarios!inner(*)))")
+      .select("*, contratos!inner(*, pessoas(*), imoveis!inner(*, proprietarios!inner(*)))")
       .eq("mes_referencia", `${mes}-01`)
       .eq("contratos.tipo", "administracao")
       .eq("contratos.imoveis.proprietario_id", proprietarioId)
@@ -98,9 +107,11 @@ export function PrestacaoContasListPage() {
         </div>
       </Card>
 
+      <TableToolbar search={search} onSearch={setSearch} total={linhas?.length ?? 0} shown={filtered.length} filter={tipo} onFilter={setTipo} filterLabel="Repasse" options={[{ value: "pendente", label: "Repasse pendente" }, { value: "repassado", label: "Repassado" }]} />
+
       {linhas === null ? (
         <LoadingState />
-      ) : linhas.length > 0 ? (
+      ) : filtered.length > 0 ? (
         <>
           <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Card className="p-5">
@@ -122,6 +133,7 @@ export function PrestacaoContasListPage() {
               <thead>
                 <tr>
                   <Th>Imóvel</Th>
+                  <Th>Locatário</Th>
                   <Th>Aluguel do inquilino</Th>
                   <Th>Bruto</Th>
                   <Th>Comissão</Th>
@@ -131,7 +143,7 @@ export function PrestacaoContasListPage() {
                 </tr>
               </thead>
               <tbody>
-                {linhas.map((p) => {
+                {filtered.map((p) => {
                   const bruto = Number(p.valor_bruto);
                   const comissao = Number(p.valor);
                   const liquido = bruto - comissao;
@@ -140,9 +152,10 @@ export function PrestacaoContasListPage() {
                     <tr key={p.id} className="hover:bg-slate-50">
                       <Td>
                         <Link to={`/contratos/${p.contrato_id}`} className="text-brand-700 hover:underline font-medium">
-                          {p.contratos?.imoveis?.rua}, {p.contratos?.imoveis?.numero}
+                          {p.contratos?.imoveis ? enderecoImovel(p.contratos.imoveis) : "-"}
                         </Link>
                       </Td>
+                      <Td>{p.contratos?.pessoas?.nome ?? "-"}</Td>
                       <Td>
                         <Badge color={p.status === "pago" ? "green" : "yellow"}>{p.status}</Badge>
                       </Td>
@@ -175,7 +188,7 @@ export function PrestacaoContasListPage() {
           </Card>
         </>
       ) : (
-        <EmptyState message={`Nenhum imóvel de administração com pagamento gerado para ${formatMonth(mes)}.`} />
+        <EmptyState message={(linhas?.length ?? 0) > 0 ? "Nenhum lançamento corresponde aos filtros." : `Nenhum imóvel de administração com pagamento gerado para ${formatMonth(mes)}.`} />
       )}
     </div>
   );

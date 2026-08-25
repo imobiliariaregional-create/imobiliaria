@@ -19,6 +19,7 @@ function enderecoCompletoImovel(imovel: Imovel): string {
   const partes = [
     imovel.numero ? `${imovel.rua}, ${imovel.numero}` : imovel.rua,
     imovel.bairro,
+    imovel.complemento,
     imovel.cidade && imovel.uf ? `${imovel.cidade}/${imovel.uf}` : imovel.cidade,
     imovel.cep ? `CEP ${imovel.cep}` : null,
   ].filter(Boolean);
@@ -98,6 +99,7 @@ export function resolverPlaceholders({ contrato, imovel, proprietario, pessoa }:
   v.rua_imovel = imovel.rua ?? "";
   v.numero_imovel = imovel.numero ?? "";
   v.bairro_imovel = imovel.bairro ?? "";
+  v.complemento_imovel = imovel.complemento ?? "";
   v.cidade_imovel = imovel.cidade ?? "";
   v.uf_imovel = imovel.uf ?? "";
   v.cep_imovel = imovel.cep ?? "";
@@ -188,6 +190,7 @@ export const PLACEHOLDERS: PlaceholderInfo[] = [
   { codigo: "#rua_imovel", descricao: "Rua do imóvel", categoria: "Imóvel" },
   { codigo: "#numero_imovel", descricao: "Número do imóvel", categoria: "Imóvel" },
   { codigo: "#bairro_imovel", descricao: "Bairro do imóvel", categoria: "Imóvel" },
+  { codigo: "#complemento_imovel", descricao: "Complemento do imóvel", categoria: "Imóvel" },
   { codigo: "#cidade_imovel", descricao: "Cidade do imóvel", categoria: "Imóvel" },
   { codigo: "#uf_imovel", descricao: "UF do imóvel", categoria: "Imóvel" },
   { codigo: "#cep_imovel", descricao: "CEP do imóvel", categoria: "Imóvel" },

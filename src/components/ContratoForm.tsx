@@ -3,6 +3,7 @@ import { Card, Field, Input, Select, Textarea, Button, Label, ErrorState } from 
 import { todayISO, addMonthsISO, formatBRL } from "@/lib/format";
 import { imovelLabel } from "@/lib/imovelLabel";
 import type { Contrato, Imovel, Pessoa } from "@/lib/types";
+import { getDraftValue, upperOrNull, useFormDraft } from "@/lib/forms";
 
 const tipoLabel: Record<string, string> = {
   aluguel: "Aluguel (taxa única sobre o 1º aluguel)",
@@ -33,13 +34,15 @@ export function ContratoForm({
   contratosAtivosPorImovel?: Map<string, Contrato>;
   defaultValues?: Partial<Contrato>;
 }) {
+  const draftId = `contrato:${defaultValues?.id ?? "novo"}`;
   const imovelInicial = imovelFixo ?? imoveis.find((i) => i.id === defaultValues?.imovel_id) ?? imoveis[0];
-  const [imovelId, setImovelId] = useState(imovelInicial?.id ?? "");
-  const [formaComissao, setFormaComissao] = useState(defaultValues?.forma_comissao_venda ?? "percentual");
-  const [valorAluguel, setValorAluguel] = useState(defaultValues?.valor_aluguel ?? "");
-  const [duracaoMeses, setDuracaoMeses] = useState(defaultValues?.duracao_meses ?? "");
+  const [imovelId, setImovelId] = useState(() => getDraftValue(draftId, "imovel_id", imovelInicial?.id ?? ""));
+  const [formaComissao, setFormaComissao] = useState(() => getDraftValue(draftId, "forma_comissao_venda", defaultValues?.forma_comissao_venda ?? "percentual"));
+  const [valorAluguel, setValorAluguel] = useState<string | number>(() => getDraftValue(draftId, "valor_aluguel", String(defaultValues?.valor_aluguel ?? "")));
+  const [duracaoMeses, setDuracaoMeses] = useState<string | number>(() => getDraftValue(draftId, "duracao_meses", String(defaultValues?.duracao_meses ?? "")));
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { formRef, saveDraft, clearDraft } = useFormDraft(draftId);
 
   const imovelSelecionado = imoveis.find((i) => i.id === imovelId) ?? imovelFixo;
   const tipo = mode === "edit" ? defaultValues?.tipo : imovelSelecionado?.tipo_operacao;
@@ -83,17 +86,19 @@ export function ContratoForm({
         valor_comissao_fixo: tipo === "venda" ? num("valor_comissao_fixo") : null,
         valor_venda: tipo === "venda" ? num("valor_venda") : null,
         status: (formData.get("status") as Contrato["status"]) || "ativo",
-        observacoes: (formData.get("observacoes") as string) || null,
+        observacoes: upperOrNull(formData.get("observacoes")),
       });
+      clearDraft();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao salvar.");
+    } finally {
       setPending(false);
     }
   }
 
   return (
     <Card className="p-6 max-w-2xl">
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form ref={formRef} onSubmit={handleSubmit} onInput={saveDraft} onChange={saveDraft} className="space-y-4">
         <input type="hidden" name="tipo" value={tipo ?? ""} />
 
         <Field label="Imóvel" htmlFor="imovel_id">

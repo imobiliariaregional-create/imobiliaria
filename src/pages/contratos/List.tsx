@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
-import { PageHeader, Card, Table, Th, Td, EmptyState, Badge, LoadingState } from "@/components/ui";
+import { PageHeader, Card, Table, Th, Td, EmptyState, Badge, LoadingState, TableToolbar } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 import type { Contrato } from "@/lib/types";
 import { useAuth } from "@/lib/auth";
+import { normalizeSearch } from "@/lib/forms";
+import { enderecoImovel } from "@/lib/imovelLabel";
 
 const tipoLabel: Record<string, string> = {
   aluguel: "Aluguel",
@@ -15,6 +17,12 @@ const tipoLabel: Record<string, string> = {
 export function ContratosListPage() {
   const { papel } = useAuth();
   const [data, setData] = useState<Contrato[] | null>(null);
+  const [search, setSearch] = useState("");
+  const [tipo, setTipo] = useState("");
+  const filtered = useMemo(() => (data ?? []).filter((item) => {
+    const haystack = normalizeSearch([item.numero_contrato, item.pessoas?.nome, item.imoveis ? enderecoImovel(item.imoveis) : "", item.status].join(" "));
+    return (!tipo || item.tipo === tipo) && haystack.includes(normalizeSearch(search));
+  }), [data, search, tipo]);
 
   useEffect(() => {
     supabase
@@ -28,10 +36,11 @@ export function ContratosListPage() {
   return (
     <div>
       <PageHeader title="Contratos" action={papel === "admin" || papel === "corretor" ? { href: "/contratos/novo", label: "Novo contrato" } : undefined} />
+      <TableToolbar search={search} onSearch={setSearch} total={data?.length ?? 0} shown={filtered.length} filter={tipo} onFilter={setTipo} options={Object.entries(tipoLabel).map(([value, label]) => ({ value, label }))} />
       <Card>
         {data === null ? (
           <LoadingState />
-        ) : data.length > 0 ? (
+        ) : filtered.length > 0 ? (
           <Table>
             <thead>
               <tr>
@@ -44,12 +53,12 @@ export function ContratosListPage() {
               </tr>
             </thead>
             <tbody>
-              {data.map((c) => (
+              {filtered.map((c) => (
                 <tr key={c.id} className="hover:bg-slate-50">
                   <Td>{c.numero_contrato ?? "-"}</Td>
                   <Td>
                     <Link to={`/contratos/${c.id}`} className="text-brand-700 hover:underline font-medium">
-                      {c.imoveis?.rua}, {c.imoveis?.numero}
+                      {c.imoveis ? enderecoImovel(c.imoveis) : "-"}
                     </Link>
                   </Td>
                   <Td>{c.pessoas?.nome ?? "-"}</Td>
@@ -63,7 +72,7 @@ export function ContratosListPage() {
             </tbody>
           </Table>
         ) : (
-          <EmptyState message="Nenhum contrato cadastrado ainda." />
+          <EmptyState message={data.length ? "Nenhum contrato corresponde aos filtros." : "Nenhum contrato cadastrado ainda."} />
         )}
       </Card>
     </div>

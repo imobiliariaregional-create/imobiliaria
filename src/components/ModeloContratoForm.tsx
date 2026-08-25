@@ -3,6 +3,7 @@ import { Card, Field, Input, Select, Button, ErrorState } from "@/components/ui"
 import { ClausulasEditor } from "@/components/ClausulasEditor";
 import { PLACEHOLDERS } from "@/lib/placeholders";
 import type { ClausulaDocumento, ModeloContrato } from "@/lib/types";
+import { upper, useFormDraft } from "@/lib/forms";
 
 export type ModeloContratoPayload = Omit<ModeloContrato, "id" | "created_at">;
 
@@ -15,9 +16,21 @@ export function ModeloContratoForm({
   onSubmit: (data: ModeloContratoPayload) => Promise<void>;
   defaultValues?: Partial<ModeloContrato>;
 }) {
-  const [clausulas, setClausulas] = useState<ClausulaDocumento[]>(defaultValues?.clausulas ?? []);
+  const draftId = `modelo:${defaultValues?.id ?? "novo"}`;
+  const clausulasKey = `imobiliaria:rascunho:${draftId}:clausulas`;
+  const [clausulas, setClausulas] = useState<ClausulaDocumento[]>(() => {
+    const saved = sessionStorage.getItem(clausulasKey);
+    if (!saved) return defaultValues?.clausulas ?? [];
+    try { return JSON.parse(saved) as ClausulaDocumento[]; } catch { return defaultValues?.clausulas ?? []; }
+  });
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { formRef, saveDraft, clearDraft } = useFormDraft(draftId);
+
+  function handleClausulasChange(next: ClausulaDocumento[]) {
+    setClausulas(next);
+    sessionStorage.setItem(clausulasKey, JSON.stringify(next));
+  }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -26,12 +39,15 @@ export function ModeloContratoForm({
     const formData = new FormData(e.currentTarget);
     try {
       await onSubmit({
-        nome: String(formData.get("nome") ?? ""),
+        nome: upper(formData.get("nome")),
         tipo_operacao: String(formData.get("tipo_operacao") ?? "aluguel") as ModeloContrato["tipo_operacao"],
         clausulas,
       });
+      clearDraft();
+      sessionStorage.removeItem(clausulasKey);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao salvar.");
+    } finally {
       setPending(false);
     }
   }
@@ -39,7 +55,7 @@ export function ModeloContratoForm({
   return (
     <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
       <Card className="p-6 xl:col-span-2">
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form ref={formRef} onSubmit={handleSubmit} onInput={saveDraft} onChange={saveDraft} className="space-y-4">
           <Field label="Nome do modelo" htmlFor="nome">
             <Input id="nome" name="nome" required defaultValue={defaultValues?.nome} placeholder="ex: Contrato de aluguel residencial" />
           </Field>
@@ -53,7 +69,7 @@ export function ModeloContratoForm({
 
           <div>
             <p className="text-sm font-medium text-slate-700 mb-2">Cláusulas do modelo</p>
-            <ClausulasEditor clausulas={clausulas} onChange={setClausulas} />
+            <ClausulasEditor clausulas={clausulas} onChange={handleClausulasChange} />
           </div>
 
           {error && <ErrorState message={error} />}
