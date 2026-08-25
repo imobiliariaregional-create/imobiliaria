@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import { Card, Field, Input, Select, Textarea, Button, Label, ErrorState } from "@/components/ui";
+import { CEPInput } from "@/components/CEPInput";
 import type { Imovel, Proprietario } from "@/lib/types";
 import { upper, upperOrNull, useFormDraft } from "@/lib/forms";
 
@@ -16,7 +17,8 @@ export function ImovelForm({
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { formRef, saveDraft, clearDraft } = useFormDraft(`imovel:${defaultValues?.id ?? "novo"}`);
+  const draftId = `imovel:${defaultValues?.id ?? "novo"}`;
+  const { formRef, saveDraft, clearDraft } = useFormDraft(draftId);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -90,9 +92,7 @@ export function ImovelForm({
           <Field label="Estado (UF)" htmlFor="uf">
             <Input id="uf" name="uf" maxLength={2} defaultValue={defaultValues?.uf ?? ""} />
           </Field>
-          <Field label="CEP" htmlFor="cep">
-            <Input id="cep" name="cep" inputMode="numeric" maxLength={9} defaultValue={defaultValues?.cep ?? ""} />
-          </Field>
+          <CEPInput defaultValue={defaultValues?.cep} draftId={draftId} />
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

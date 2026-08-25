@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatCNPJ, formatCPF, isValidCNPJ, isValidCPF, normalizeSearch, upper } from "@/lib/forms";
+import { formatCEP, formatCNPJ, formatCPF, isValidCEP, isValidCNPJ, isValidCPF, normalizeSearch, upper } from "@/lib/forms";
 
 describe("documentos brasileiros", () => {
   it("formata e valida CPF", () => {
@@ -22,5 +22,15 @@ describe("padronização de texto", () => {
 
   it("faz busca sem diferenciar caixa ou acentos", () => {
     expect(normalizeSearch("Administração")).toBe("administracao");
+  });
+});
+
+describe("CEP brasileiro", () => {
+  it("formata e valida oito dígitos", () => {
+    expect(formatCEP("68750000")).toBe("68750-000");
+    expect(formatCEP("68750-0009")).toBe("68750-000");
+    expect(isValidCEP("68750-000")).toBe(true);
+    expect(isValidCEP("68750000")).toBe(false);
+    expect(isValidCEP("68750-00")).toBe(false);
   });
 });

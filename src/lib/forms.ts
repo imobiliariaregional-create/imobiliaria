@@ -25,6 +25,15 @@ export function formatCPFCNPJ(value: string, tipo: "fisica" | "juridica") {
   return tipo === "juridica" ? formatCNPJ(value) : formatCPF(value);
 }
 
+export function formatCEP(value: string) {
+  const digits = onlyDigits(value).slice(0, 8);
+  return digits.replace(/^(\d{5})(\d)/, "$1-$2");
+}
+
+export function isValidCEP(value: string) {
+  return /^\d{5}-\d{3}$/.test(value);
+}
+
 function calculateDigit(base: string, weights: number[]) {
   const total = base.split("").reduce((sum, digit, index) => sum + Number(digit) * weights[index], 0);
   const rest = total % 11;
