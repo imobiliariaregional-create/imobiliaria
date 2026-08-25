@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Field, Input } from "@/components/ui";
+import { Button, Field, Input } from "@/components/ui";
 import { formatCPFCNPJ, getDraftValue, validateCPFCNPJ } from "@/lib/forms";
 import type { TipoPessoa } from "@/lib/types";
 
@@ -11,6 +11,7 @@ export function DocumentoInput({
   label,
   required = true,
   draftId,
+  onCNPJLookup,
 }: {
   id: string;
   name: string;
@@ -19,8 +20,11 @@ export function DocumentoInput({
   label?: string;
   required?: boolean;
   draftId?: string;
+  onCNPJLookup?: (cnpj: string) => Promise<void>;
 }) {
   const [value, setValue] = useState(() => formatCPFCNPJ(draftId ? getDraftValue(draftId, name, defaultValue ?? "") : defaultValue ?? "", tipo));
+  const [lookupPending, setLookupPending] = useState(false);
+  const [lookupMessage, setLookupMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
     setValue((current) => formatCPFCNPJ(current, tipo));
@@ -29,6 +33,20 @@ export function DocumentoInput({
   function validate(input: HTMLInputElement) {
     if (!input.value && !required) input.setCustomValidity("");
     else input.setCustomValidity(validateCPFCNPJ(input.value, tipo) ? "" : `${tipo === "juridica" ? "CNPJ" : "CPF"} inválido.`);
+  }
+
+  async function handleLookup() {
+    if (!onCNPJLookup || !validateCPFCNPJ(value, "juridica")) return;
+    setLookupPending(true);
+    setLookupMessage(null);
+    try {
+      await onCNPJLookup(value);
+      setLookupMessage({ type: "success", text: "Dados encontrados. Confira antes de salvar." });
+    } catch (error) {
+      setLookupMessage({ type: "error", text: error instanceof Error ? error.message : "Erro ao consultar CNPJ." });
+    } finally {
+      setLookupPending(false);
+    }
   }
 
   return (
@@ -49,6 +67,18 @@ export function DocumentoInput({
         onBlur={(event) => validate(event.currentTarget)}
         onInvalid={(event) => validate(event.currentTarget)}
       />
+      {tipo === "juridica" && onCNPJLookup && (
+        <div className="mt-2">
+          <Button type="button" variant="secondary" className="min-h-8 px-3 py-1 text-xs" disabled={lookupPending || !validateCPFCNPJ(value, "juridica")} onClick={handleLookup}>
+            {lookupPending ? "Consultando..." : "Consultar CNPJ"}
+          </Button>
+          {lookupMessage && (
+            <p className={`mt-1.5 text-xs ${lookupMessage.type === "success" ? "text-emerald-700" : "text-red-600"}`}>
+              {lookupMessage.text}
+            </p>
+          )}
+        </div>
+      )}
     </Field>
   );
 }

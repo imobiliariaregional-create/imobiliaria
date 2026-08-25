@@ -2,7 +2,8 @@ import { FormEvent, useState } from "react";
 import { Card, Field, Input, Select, Textarea, Button, Label, ErrorState } from "@/components/ui";
 import type { Proprietario } from "@/lib/types";
 import { DocumentoInput } from "@/components/DocumentoInput";
-import { getDraftValue, upper, upperOrNull, useFormDraft, validateCPFCNPJ } from "@/lib/forms";
+import { applyFormValues, getDraftValue, upper, upperOrNull, useFormDraft, validateCPFCNPJ } from "@/lib/forms";
+import { consultarCNPJ } from "@/lib/cnpj";
 
 export function ProprietarioForm({
   onSubmit,
@@ -16,6 +17,10 @@ export function ProprietarioForm({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { formRef, saveDraft, clearDraft } = useFormDraft(draftId);
+
+  async function handleCNPJLookup(cnpj: string) {
+    applyFormValues(formRef.current, await consultarCNPJ(cnpj));
+  }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -90,7 +95,7 @@ export function ProprietarioForm({
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <DocumentoInput id="cpf_cnpj" name="cpf_cnpj" tipo={tipoPessoa} defaultValue={defaultValues?.cpf_cnpj} draftId={draftId} />
+          <DocumentoInput id="cpf_cnpj" name="cpf_cnpj" tipo={tipoPessoa} defaultValue={defaultValues?.cpf_cnpj} draftId={draftId} onCNPJLookup={handleCNPJLookup} />
           {tipoPessoa === "fisica" && <Field label="RG" htmlFor="rg">
             <Input id="rg" name="rg" defaultValue={defaultValues?.rg ?? ""} />
           </Field>}

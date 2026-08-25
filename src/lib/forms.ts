@@ -97,6 +97,18 @@ export function normalizeSearch(value: unknown) {
     .toLocaleLowerCase("pt-BR");
 }
 
+export function applyFormValues(form: HTMLFormElement | null, values: object) {
+  if (!form) return;
+  for (const [name, value] of Object.entries(values)) {
+    if (!value) continue;
+    const element = form.elements.namedItem(name);
+    if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement)) continue;
+    element.value = value;
+    element.dispatchEvent(new Event("input", { bubbles: true }));
+    element.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+}
+
 type DraftData = Record<string, string | boolean>;
 
 export function getDraftValue<T extends string>(formId: string, name: string, fallback: T): T {
