@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Política de Privacidade do Sistema de Gestão da Imobiliária Regional." />
+  <title>Política de Privacidade | Imobiliária Regional</title>
+  <style>
+    :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #18352b; background: #f3f7f5; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f3f7f5; }
+    main { width: min(780px, calc(100% - 32px)); margin: 0 auto; padding: 64px 0; }
+    article { padding: clamp(26px, 6vw, 54px); border: 1px solid #d9e4df; border-radius: 28px; background: white; box-shadow: 0 24px 70px rgba(20,64,48,.08); }
+    .eyebrow { margin: 0 0 8px; color: #187252; font-size: 12px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+    h1 { margin: 0 0 10px; color: #10251e; font-size: clamp(32px, 6vw, 48px); letter-spacing: -.04em; }
+    h2 { margin: 34px 0 8px; color: #10251e; font-size: 20px; }
+    p, li { color: #4b6259; font-size: 15px; line-height: 1.75; }
+    ul { padding-left: 22px; }
+    a { color: #176b4c; font-weight: 700; }
+    .back { display: inline-block; margin-bottom: 20px; }
+    .updated { color: #71877f; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <main>
+    <a class="back" href="./sobre.html">← Sobre o sistema</a>
+    <article>
+      <p class="eyebrow">Imobiliária Regional</p>
+      <h1>Política de Privacidade</h1>
+      <p class="updated">Última atualização: 26 de agosto de 2026.</p>
+      <p>Esta política explica como o Sistema de Gestão da Imobiliária Regional utiliza dados do Google quando uma conta autorizada conecta o Google Drive ao sistema.</p>
+      <h2>Dados acessados</h2>
+      <p>A integração solicita o escopo <code>drive.file</code>. Ele permite criar e gerenciar somente os arquivos do Google Drive utilizados pelo aplicativo. O sistema não solicita acesso geral a todos os documentos da conta.</p>
+      <h2>Finalidade</h2>
+      <p>O acesso é utilizado para enviar, baixar, substituir e excluir contratos de autorização de administração imobiliária cadastrados por usuários autenticados e autorizados.</p>
+      <h2>Armazenamento</h2>
+      <ul>
+        <li>O conteúdo dos anexos fica armazenado no Google Drive da imobiliária.</li>
+        <li>O banco de dados guarda apenas identificador, nome, tipo e tamanho do arquivo.</li>
+        <li>O token de atualização OAuth é armazenado como secret da função no Supabase e não é exposto ao navegador.</li>
+      </ul>
+      <h2>Compartilhamento e uso</h2>
+      <p>Os dados obtidos por meio da integração não são vendidos nem utilizados para publicidade. Eles são tratados somente para oferecer a funcionalidade de gestão documental descrita nesta política e por provedores técnicos necessários à operação do sistema.</p>
+      <h2>Retenção e exclusão</h2>
+      <p>Os documentos permanecem no Google Drive enquanto forem necessários à operação da imobiliária. Usuários autorizados podem excluí-los pelo sistema ou diretamente no Drive. A autorização do aplicativo também pode ser revogada nas configurações de segurança da Conta Google.</p>
+      <h2>Segurança</h2>
+      <p>O acesso aos documentos exige autenticação no sistema. Credenciais sensíveis permanecem no ambiente servidor, e a pasta do Google Drive não precisa ser pública.</p>
+      <h2>Contato</h2>
+      <p>Dúvidas ou solicitações relacionadas à privacidade podem ser encaminhadas ao e-mail de suporte informado na tela de autorização do Google ou pelos canais oficiais da Imobiliária Regional.</p>
+    </article>
+  </main>
+</body>
+</html>
