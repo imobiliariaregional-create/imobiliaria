@@ -2,8 +2,9 @@ import { FormEvent, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { PageHeader, Card, Field, Input, Select, Textarea, Button, ErrorState, LoadingState } from "@/components/ui";
-import { todayISO } from "@/lib/format";
-import type { Contrato } from "@/lib/types";
+import { formatBRL, formatMonth, todayISO } from "@/lib/format";
+import { CurrencyInput } from "@/components/CurrencyInput";
+import type { Contrato, PagamentoMensal } from "@/lib/types";
 import { useAuth } from "@/lib/auth";
 import { upperOrNull, useFormDraft } from "@/lib/forms";
 
@@ -14,17 +15,22 @@ export function NovaNotaFiscalPage() {
   const contratoIdParam = searchParams.get("contrato_id") ?? "";
 
   const [contratos, setContratos] = useState<Contrato[] | null>(null);
+  const [pagamentos, setPagamentos] = useState<PagamentoMensal[]>([]);
+  const [pagamentoId, setPagamentoId] = useState("");
+  const [contratoId, setContratoId] = useState(contratoIdParam);
+  const [valorSugerido, setValorSugerido] = useState<number | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { formRef, saveDraft, clearDraft } = useFormDraft("nota-fiscal:nova");
 
   useEffect(() => {
-    supabase
-      .from("contratos")
-      .select("*, imoveis(*)")
-      .order("created_at", { ascending: false })
-      .returns<Contrato[]>()
-      .then(({ data }) => setContratos(data ?? []));
+    Promise.all([
+      supabase.from("contratos").select("*, imoveis(*)").order("created_at", { ascending: false }).returns<Contrato[]>(),
+      supabase.from("pagamentos_mensais").select("*, contratos(*, imoveis(*), pessoas(*))").order("mes_referencia", { ascending: false }).returns<PagamentoMensal[]>(),
+    ]).then(([contratosRes, pagamentosRes]) => {
+      setContratos(contratosRes.data ?? []);
+      setPagamentos(pagamentosRes.data ?? []);
+    });
   }, []);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -38,6 +44,7 @@ export function NovaNotaFiscalPage() {
     const data_emissao = String(formData.get("data_emissao"));
     const descricao = upperOrNull(formData.get("descricao"));
     const contrato_id = (formData.get("contrato_id") as string) || null;
+    const pagamento_mensal_id = (formData.get("pagamento_mensal_id") as string) || null;
     const arquivo = formData.get("arquivo") as File | null;
 
     try {
@@ -57,6 +64,7 @@ export function NovaNotaFiscalPage() {
         data_emissao,
         descricao,
         contrato_id,
+        pagamento_mensal_id,
         arquivo_url,
       });
       if (error) {
@@ -86,16 +94,35 @@ export function NovaNotaFiscalPage() {
           <Field label="Número da nota" htmlFor="numero">
             <Input id="numero" name="numero" />
           </Field>
+          <Field label="Comissão/receita vinculada (opcional)" htmlFor="pagamento_mensal_id">
+            <Select
+              id="pagamento_mensal_id"
+              name="pagamento_mensal_id"
+              value={pagamentoId}
+              onChange={(event) => {
+                const id = event.target.value;
+                const pagamento = pagamentos.find((item) => item.id === id);
+                setPagamentoId(id);
+                setValorSugerido(pagamento ? Number(pagamento.valor) : null);
+                if (pagamento) setContratoId(pagamento.contrato_id);
+              }}
+            >
+              <option value="">Lançamento manual</option>
+              {pagamentos.map((pagamento) => (
+                <option key={pagamento.id} value={pagamento.id}>
+                  {formatMonth(pagamento.mes_referencia.slice(0, 7))} · {pagamento.contratos?.pessoas?.nome ?? "SEM CLIENTE"} · comissão {formatBRL(pagamento.valor)}
+                </option>
+              ))}
+            </Select>
+          </Field>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Valor (R$)" htmlFor="valor">
-              <Input id="valor" name="valor" type="number" step="0.01" min="0" required />
-            </Field>
+            <CurrencyInput key={pagamentoId || "manual"} id="valor" name="valor" label="Valor da nota fiscal" required min={0} defaultValue={valorSugerido} draftId="nota-fiscal:nova" />
             <Field label="Data de emissão" htmlFor="data_emissao">
               <Input id="data_emissao" name="data_emissao" type="date" required defaultValue={todayISO()} />
             </Field>
           </div>
           <Field label="Contrato vinculado (opcional)" htmlFor="contrato_id">
-            <Select id="contrato_id" name="contrato_id" defaultValue={contratoIdParam}>
+            <Select id="contrato_id" name="contrato_id" value={contratoId} onChange={(event) => setContratoId(event.target.value)}>
               <option value="">Nenhum</option>
               {contratos.map((c) => (
                 <option key={c.id} value={c.id}>

@@ -4,15 +4,16 @@ import { CurrencyInput } from "@/components/CurrencyInput";
 import { ImovelForm, type ImovelPayload } from "@/components/ImovelForm";
 import { Modal } from "@/components/Modal";
 import { PessoaForm, type PessoaPayload } from "@/components/PessoaForm";
-import { todayISO, addMonthsISO, formatBRL } from "@/lib/format";
+import { todayISO, addMonthsISO, formatBRL, formatDate } from "@/lib/format";
 import { imovelLabel } from "@/lib/imovelLabel";
 import type { Contrato, Imovel, Pessoa, Proprietario } from "@/lib/types";
 import { getDraftValue, parseBRLInput, upperOrNull, useFormDraft } from "@/lib/forms";
 import { Plus } from "lucide-react";
+import type { ProprietarioPayload } from "@/components/ProprietarioForm";
 
 const tipoLabel: Record<string, string> = {
   aluguel: "Aluguel (taxa única sobre o 1º aluguel)",
-  administracao: "Administração (10% do aluguel todo mês)",
+  administracao: "Administração (comissão mensal configurável)",
   venda: "Venda",
 };
 
@@ -33,6 +34,7 @@ export function ContratoForm({
   proprietarios = [],
   onCreateImovel,
   onCreatePessoa,
+  onCreateProprietario,
 }: {
   onSubmit: (data: ContratoPayload) => Promise<void>;
   mode: "create" | "edit";
@@ -44,6 +46,7 @@ export function ContratoForm({
   proprietarios?: Proprietario[];
   onCreateImovel?: (data: ImovelPayload) => Promise<Imovel>;
   onCreatePessoa?: (data: PessoaPayload) => Promise<Pessoa>;
+  onCreateProprietario?: (data: ProprietarioPayload) => Promise<Proprietario>;
 }) {
   const draftId = `contrato:${defaultValues?.id ?? "novo"}`;
   const imovelInicial = imovelFixo ?? imoveis.find((i) => i.id === defaultValues?.imovel_id) ?? imoveis[0];
@@ -54,6 +57,8 @@ export function ContratoForm({
     parseBRLInput(getDraftValue(draftId, "valor_aluguel_display", String(defaultValues?.valor_aluguel ?? ""))),
   );
   const [duracaoMeses, setDuracaoMeses] = useState<string | number>(() => getDraftValue(draftId, "duracao_meses", String(defaultValues?.duracao_meses ?? "")));
+  const [dataInicio, setDataInicio] = useState(() => getDraftValue(draftId, "data_inicio", defaultValues?.data_inicio ?? todayISO()));
+  const [recebimentoAluguel, setRecebimentoAluguel] = useState(() => getDraftValue(draftId, "recebimento_aluguel", defaultValues?.recebimento_aluguel ?? "imobiliaria"));
   const [modalImovel, setModalImovel] = useState(false);
   const [modalPessoa, setModalPessoa] = useState(false);
   const [pending, setPending] = useState(false);
@@ -70,6 +75,7 @@ export function ContratoForm({
     if (!v || !m || tipo === "venda") return null;
     return v * m;
   }, [valorAluguel, duracaoMeses, tipo]);
+  const vigenciaFinal = tipo !== "venda" && Number(duracaoMeses) > 0 ? addMonthsISO(dataInicio, Number(duracaoMeses)) : null;
 
   async function handleCreateImovel(data: ImovelPayload) {
     if (!onCreateImovel) return;
@@ -97,7 +103,7 @@ export function ContratoForm({
       return Number(v);
     }
 
-    const dataInicio = String(formData.get("data_inicio"));
+    const dataInicioPayload = String(formData.get("data_inicio"));
     const duracao = tipo !== "venda" ? num("duracao_meses") : null;
 
     try {
@@ -106,10 +112,12 @@ export function ContratoForm({
         pessoa_id: (formData.get("pessoa_id") as string) || null,
         tipo: tipo as Contrato["tipo"],
         valor_aluguel: tipo !== "venda" ? num("valor_aluguel") : null,
+        percentual_administracao: tipo === "administracao" ? num("percentual_administracao") : null,
+        recebimento_aluguel: tipo === "administracao" ? formData.get("recebimento_aluguel") as Contrato["recebimento_aluguel"] : null,
         dia_pagamento: tipo !== "venda" ? num("dia_pagamento") : null,
-        data_inicio: dataInicio,
+        data_inicio: dataInicioPayload,
         duracao_meses: duracao,
-        vigencia_final: duracao ? addMonthsISO(dataInicio, duracao) : null,
+        vigencia_final: duracao ? addMonthsISO(dataInicioPayload, duracao) : null,
         periodo_visita_dias: tipo !== "venda" ? num("periodo_visita_dias") : null,
         forma_comissao_venda: tipo === "venda" ? (String(formData.get("forma_comissao_venda")) as Contrato["forma_comissao_venda"]) : null,
         percentual_comissao: tipo === "venda" ? num("percentual_comissao") : null,
@@ -185,15 +193,21 @@ export function ContratoForm({
           </Select>
         </div>
 
-        <Field label="Data de início" htmlFor="data_inicio">
-          <Input
-            id="data_inicio"
-            name="data_inicio"
-            type="date"
-            required
-            defaultValue={defaultValues?.data_inicio ?? todayISO()}
-          />
-        </Field>
+        <div className={`grid grid-cols-1 gap-4 ${tipo !== "venda" ? "sm:grid-cols-2" : ""}`}>
+          <Field label="Data de início" htmlFor="data_inicio">
+            <Input id="data_inicio" name="data_inicio" type="date" required value={dataInicio} onChange={(event) => setDataInicio(event.target.value)} />
+          </Field>
+          {tipo !== "venda" && (
+            <Field label="Duração total (meses)" htmlFor="duracao_meses">
+              <Input id="duracao_meses" name="duracao_meses" type="number" min={1} max={60} required value={duracaoMeses} onChange={(event) => setDuracaoMeses(event.target.value)} />
+            </Field>
+          )}
+        </div>
+        {vigenciaFinal && (
+          <p className="-mt-2 rounded-xl bg-brand-50 px-3.5 py-2.5 text-sm text-brand-800">
+            Término previsto do contrato: <strong>{formatDate(vigenciaFinal)}</strong>
+          </p>
+        )}
 
         {tipo !== "venda" && (
           <>
@@ -221,22 +235,23 @@ export function ContratoForm({
               </Field>
             </div>
             {tipo === "administracao" && (
-              <p className="text-xs text-slate-500 -mt-2">
-                A imobiliária recebe 10% desse valor todo mês, gerado automaticamente até a vigência final.
-              </p>
+              <div className="grid grid-cols-1 gap-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 sm:grid-cols-2">
+                <Field label="Comissão da imobiliária (%)" htmlFor="percentual_administracao">
+                  <Input id="percentual_administracao" name="percentual_administracao" type="number" step="0.01" min="0.01" max="100" required defaultValue={defaultValues?.percentual_administracao ?? 10} />
+                </Field>
+                <Field label="Quem recebe o aluguel do inquilino?" htmlFor="recebimento_aluguel">
+                  <Select id="recebimento_aluguel" name="recebimento_aluguel" value={recebimentoAluguel} onChange={(event) => setRecebimentoAluguel(event.target.value as Contrato["recebimento_aluguel"] & string)}>
+                    <option value="imobiliaria">Imobiliária recebe e repassa</option>
+                    <option value="proprietario">Proprietário recebe diretamente</option>
+                  </Select>
+                </Field>
+                <p className="text-xs text-slate-500 sm:col-span-2">
+                  {recebimentoAluguel === "imobiliaria"
+                    ? "O sistema controla o aluguel recebido, desconta a comissão e calcula o repasse ao proprietário."
+                    : "O sistema controla somente a comissão devida à imobiliária; não cria repasse do aluguel."}
+                </p>
+              </div>
             )}
-            <Field label="Duração (meses)" htmlFor="duracao_meses">
-              <Input
-                id="duracao_meses"
-                name="duracao_meses"
-                type="number"
-                min={1}
-                max={60}
-                required
-                defaultValue={defaultValues?.duracao_meses ?? ""}
-                onChange={(e) => setDuracaoMeses(e.target.value)}
-              />
-            </Field>
             {valorTotalEstimado !== null && (
               <p className="text-xs text-slate-500 -mt-2">
                 Valor total estimado do contrato: <span className="font-medium">{formatBRL(valorTotalEstimado)}</span>
@@ -341,7 +356,7 @@ export function ContratoForm({
       </form>
     </Card>
     <Modal open={modalImovel} title="Cadastrar imóvel durante o contrato" onClose={() => setModalImovel(false)}>
-      <ImovelForm onSubmit={handleCreateImovel} proprietarios={proprietarios} />
+      <ImovelForm onSubmit={handleCreateImovel} proprietarios={proprietarios} onCreateProprietario={onCreateProprietario} />
     </Modal>
     <Modal open={modalPessoa} title={`Cadastrar ${tipo === "venda" ? "comprador" : "inquilino"}`} onClose={() => setModalPessoa(false)}>
       <PessoaForm onSubmit={handleCreatePessoa} />

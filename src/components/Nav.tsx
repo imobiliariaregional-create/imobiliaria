@@ -2,7 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
-import { Building2, ChevronRight, CircleDollarSign, FileBadge, FileText, Gauge, House, Landmark, LogOut, ReceiptText, UserRound, UsersRound, X, Zap } from "lucide-react";
+import { Building2, ChevronRight, CircleDollarSign, FileBadge, FileCheck2, FileText, Gauge, House, Landmark, LogOut, ReceiptText, UserRound, UsersRound, X, Zap } from "lucide-react";
 
 type NavItem = { href: string; label: string; icon: LucideIcon };
 
@@ -15,6 +15,7 @@ const groups: { label: string; links: NavItem[] }[] = [
   ] },
   { label: "Operação", links: [
     { href: "/contratos", label: "Contratos", icon: FileText },
+    { href: "/autorizacoes", label: "Autorizações", icon: FileCheck2 },
     { href: "/modelos-contrato", label: "Modelos", icon: FileBadge },
   ] },
   { label: "Financeiro", links: [

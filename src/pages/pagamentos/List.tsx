@@ -71,7 +71,8 @@ export function PagamentosListPage() {
                 <Th>Endereço do imóvel</Th>
                 <Th>Tipo</Th>
                 <Th>Mês</Th>
-                <Th>Valor</Th>
+                <Th>Valor de referência</Th>
+                <Th>Receita da imobiliária</Th>
                 <Th>Vencimento</Th>
                 <Th>Status</Th>
                 <Th>Ação</Th>
@@ -94,11 +95,14 @@ export function PagamentosListPage() {
                     </Td>
                     <Td>{p.contratos ? tipoLabel[p.contratos.tipo] : "-"}</Td>
                     <Td>{formatMonth(p.mes_referencia.slice(0, 7))}</Td>
+                    <Td>{formatBRL(p.valor_bruto)}</Td>
                     <Td>{formatBRL(p.valor)}</Td>
                     <Td>{formatDate(p.data_vencimento)}</Td>
                     <Td>
                       <Badge color={p.status === "pago" ? "green" : atrasado ? "red" : "yellow"}>
-                        {p.status === "pago" ? "pago" : atrasado ? "atrasado" : "pendente"}
+                        {p.status === "pago"
+                          ? p.contratos?.tipo === "administracao" && p.contratos.recebimento_aluguel === "imobiliaria" ? "aluguel recebido" : "receita recebida"
+                          : atrasado ? "atrasado" : "pendente"}
                       </Badge>
                     </Td>
                     <Td>
@@ -108,7 +112,11 @@ export function PagamentosListPage() {
                         disabled={p.status === "pago" && p.valor_repassado !== null}
                         onClick={() => toggle(p)}
                       >
-                        {p.status === "pago" ? "Marcar pendente" : "Marcar pago"}
+                        {p.status === "pago"
+                          ? "Desfazer recebimento"
+                          : p.contratos?.tipo === "administracao" && p.contratos.recebimento_aluguel === "imobiliaria"
+                            ? "Registrar aluguel recebido"
+                            : "Registrar comissão recebida"}
                       </Button> : <span className="text-xs text-slate-400">Somente leitura</span>}
                     </Td>
                   </tr>

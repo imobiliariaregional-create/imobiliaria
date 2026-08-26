@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatCEP, formatCNPJ, formatCPF, isValidCEP, isValidCNPJ, isValidCPF, normalizeSearch, parseBRLInput, upper } from "@/lib/forms";
+import { formatCEP, formatCNPJ, formatCPF, formatPhone, formatPixKey, isValidCEP, isValidCNPJ, isValidCPF, isValidPhone, isValidPixKey, normalizeSearch, parseBRLInput, upper } from "@/lib/forms";
 
 describe("documentos brasileiros", () => {
   it("formata e valida CPF", () => {
@@ -41,5 +41,22 @@ describe("valor monetário brasileiro", () => {
     expect(parseBRLInput("R$ 1.000,00")).toBe(1000);
     expect(parseBRLInput("1250,75")).toBe(1250.75);
     expect(parseBRLInput("")).toBeNull();
+  });
+});
+
+describe("telefone e PIX", () => {
+  it("formata e valida telefone nacional", () => {
+    expect(formatPhone("91987654321")).toBe("(91) 98765-4321");
+    expect(formatPhone("9132345678")).toBe("(91) 3234-5678");
+    expect(isValidPhone("(91) 98765-4321")).toBe(true);
+    expect(isValidPhone("12345")).toBe(false);
+  });
+
+  it("formata e valida a chave conforme o tipo PIX", () => {
+    expect(formatPixKey("52998224725", "cpf")).toBe("529.982.247-25");
+    expect(isValidPixKey("529.982.247-25", "cpf")).toBe(true);
+    expect(formatPixKey("USUARIO@EXEMPLO.COM", "email")).toBe("usuario@exemplo.com");
+    expect(isValidPixKey("usuario@exemplo.com", "email")).toBe(true);
+    expect(isValidPixKey("529.982.247-25", "cnpj")).toBe(false);
   });
 });

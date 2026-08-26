@@ -24,6 +24,7 @@ import { PrestacaoContasListPage } from "@/pages/prestacaoContas/List";
 import { ContasConsumoListPage } from "@/pages/contasConsumo/List";
 import { NotasFiscaisListPage } from "@/pages/notasFiscais/List";
 import { NovaNotaFiscalPage } from "@/pages/notasFiscais/New";
+import { AutorizacoesListPage } from "@/pages/autorizacoes/List";
 
 const ContratoDocumentoPage = lazy(() =>
   import("@/pages/contratos/Documento").then((modulo) => ({ default: modulo.ContratoDocumentoPage })),
@@ -59,6 +60,7 @@ export function App() {
             <Route path="/imoveis/:id" element={<ImovelDetailPage />} />
 
             <Route path="/contratos" element={<ContratosListPage />} />
+            <Route path="/autorizacoes" element={<AutorizacoesListPage />} />
             <Route path="/contratos/novo" element={<NovoContratoPage />} />
             <Route path="/contratos/:id" element={<ContratoDetailPage />} />
             <Route

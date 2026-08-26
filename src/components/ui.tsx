@@ -48,7 +48,13 @@ export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
       {...inputProps}
       autoCapitalize={uppercase ? "characters" : props.autoCapitalize}
       onInput={(event) => {
-        if (uppercase) event.currentTarget.value = event.currentTarget.value.toLocaleUpperCase("pt-BR");
+        if (uppercase) {
+          const { selectionStart, selectionEnd } = event.currentTarget;
+          event.currentTarget.value = event.currentTarget.value.toLocaleUpperCase("pt-BR");
+          if (selectionStart !== null && selectionEnd !== null) {
+            event.currentTarget.setSelectionRange(selectionStart, selectionEnd);
+          }
+        }
         onInput?.(event);
       }}
       className={`min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-brand-600 focus:ring-4 focus:ring-brand-100 disabled:bg-slate-50 disabled:text-slate-500 ${props.className ?? ""}`}
@@ -63,7 +69,9 @@ export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
       {...textareaProps}
       autoCapitalize="characters"
       onInput={(event) => {
+        const { selectionStart, selectionEnd } = event.currentTarget;
         event.currentTarget.value = event.currentTarget.value.toLocaleUpperCase("pt-BR");
+        event.currentTarget.setSelectionRange(selectionStart, selectionEnd);
         onInput?.(event);
       }}
       className={`w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-brand-600 focus:ring-4 focus:ring-brand-100 disabled:bg-slate-50 ${props.className ?? ""}`}

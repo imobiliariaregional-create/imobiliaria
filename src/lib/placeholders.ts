@@ -51,6 +51,8 @@ export function resolverPlaceholders({ contrato, imovel, proprietario, pessoa }:
   v.representante_cpf_proprietario = proprietario.representante_cpf ?? "";
   v.representante_rg_proprietario = proprietario.representante_rg ?? "";
   v.chave_pix_proprietario = proprietario.chave_pix ?? "";
+  v.tipo_chave_pix_proprietario = proprietario.tipo_chave_pix ?? "";
+  v.titular_conta_proprietario = proprietario.titular_conta ?? "";
   v.banco_proprietario = proprietario.banco ?? "";
   v.agencia_proprietario = proprietario.agencia ?? "";
   v.conta_proprietario = proprietario.conta ?? "";
@@ -169,6 +171,8 @@ export const PLACEHOLDERS: PlaceholderInfo[] = [
   { codigo: "#representante_cpf_proprietario", descricao: "CPF do representante legal", categoria: "Proprietário" },
   { codigo: "#representante_rg_proprietario", descricao: "RG do representante legal", categoria: "Proprietário" },
   { codigo: "#chave_pix_proprietario", descricao: "Chave PIX do proprietário", categoria: "Proprietário" },
+  { codigo: "#tipo_chave_pix_proprietario", descricao: "Tipo da chave PIX", categoria: "Proprietário" },
+  { codigo: "#titular_conta_proprietario", descricao: "Titular da conta", categoria: "Proprietário" },
   { codigo: "#banco_proprietario", descricao: "Banco do proprietário", categoria: "Proprietário" },
   { codigo: "#agencia_proprietario", descricao: "Agência bancária do proprietário", categoria: "Proprietário" },
   { codigo: "#conta_proprietario", descricao: "Conta bancária do proprietário", categoria: "Proprietário" },

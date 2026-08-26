@@ -47,6 +47,7 @@ export function PrestacaoContasListPage() {
       .select("*, contratos!inner(*, pessoas(*), imoveis!inner(*, proprietarios!inner(*)))")
       .eq("mes_referencia", `${mes}-01`)
       .eq("contratos.tipo", "administracao")
+      .eq("contratos.recebimento_aluguel", "imobiliaria")
       .eq("contratos.imoveis.proprietario_id", proprietarioId)
       .order("created_at", { ascending: true })
       .returns<PagamentoMensal[]>();
@@ -119,7 +120,7 @@ export function PrestacaoContasListPage() {
               <p className="text-2xl font-semibold text-slate-900 mt-1">{formatBRL(totalBruto)}</p>
             </Card>
             <Card className="p-5">
-              <p className="text-sm text-slate-500">Comissão da imobiliária (10%)</p>
+              <p className="text-sm text-slate-500">Comissão da imobiliária</p>
               <p className="text-2xl font-semibold text-slate-900 mt-1">{formatBRL(totalComissao)}</p>
             </Card>
             <Card className="p-5">

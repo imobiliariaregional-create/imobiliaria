@@ -6,10 +6,13 @@ export type TipoConsumo = "agua" | "energia";
 export type StatusConsumo = "pago" | "pendente";
 export type TipoLaudo = "entrada" | "renovacao" | "saida";
 export type FormaComissaoVenda = "percentual" | "fixo";
+export type RecebimentoAluguel = "imobiliaria" | "proprietario";
 export type TipoPessoa = "fisica" | "juridica";
 export type TipoContaBancaria = "corrente" | "poupanca";
 export type TipoImovel = "residencial" | "comercial";
+export type TipoChavePix = "cpf" | "cnpj" | "telefone" | "email" | "aleatoria";
 export type PapelUsuario = "admin" | "financeiro" | "corretor";
+export type StatusAutorizacao = "ativa" | "encerrada" | "cancelada";
 
 export interface Perfil {
   user_id: string;
@@ -25,6 +28,8 @@ export interface Proprietario {
   telefone: string | null;
   email: string | null;
   chave_pix: string | null;
+  tipo_chave_pix: TipoChavePix | null;
+  titular_conta: string | null;
   observacoes: string | null;
   endereco: string | null;
   rg: string | null;
@@ -82,6 +87,8 @@ export interface Contrato {
   tipo: TipoOperacao;
   numero_contrato: string | null;
   valor_aluguel: number | null;
+  percentual_administracao: number | null;
+  recebimento_aluguel: RecebimentoAluguel | null;
   dia_pagamento: number | null;
   data_inicio: string;
   duracao_meses: number | null;
@@ -144,6 +151,7 @@ export interface NotaFiscal {
   descricao: string | null;
   arquivo_url: string | null;
   contrato_id: string | null;
+  pagamento_mensal_id: string | null;
   created_at: string;
   contratos?: Contrato | null;
 }
@@ -172,4 +180,22 @@ export interface ContratoGerado {
   assinafy_assignment_id: string | null;
   assinafy_status: string | null;
   assinafy_resumo: { signer_count: number; completed_count: number } | null;
+}
+
+export interface AutorizacaoAdministracao {
+  id: string;
+  proprietario_id: string;
+  numero: string | null;
+  data_inicio: string;
+  data_fim: string | null;
+  status: StatusAutorizacao;
+  observacoes: string | null;
+  drive_file_id: string | null;
+  drive_file_name: string | null;
+  drive_mime_type: string | null;
+  drive_file_size: number | null;
+  created_at: string;
+  updated_at: string;
+  proprietarios?: Proprietario | null;
+  autorizacao_imoveis?: { imovel_id: string; imoveis?: Imovel | null }[];
 }

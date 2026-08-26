@@ -260,11 +260,11 @@ export function ContratoDetailPage() {
                   <li key={p.id} className="px-4 py-3 flex items-center justify-between text-sm">
                     <div>
                       <span className="font-medium">{formatMonth(p.mes_referencia.slice(0, 7))}</span>
-                      <span className="text-slate-500"> · {formatBRL(p.valor)} · vencimento {formatDate(p.data_vencimento)}</span>
+                      <span className="text-slate-500"> · referência {formatBRL(p.valor_bruto)} · receita da imobiliária {formatBRL(p.valor)} · vencimento {formatDate(p.data_vencimento)}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge color={p.status === "pago" ? "green" : atrasado ? "red" : "yellow"}>
-                        {p.status === "pago" ? "pago" : atrasado ? "atrasado" : "pendente"}
+                        {p.status === "pago" ? contrato.tipo === "administracao" && contrato.recebimento_aluguel === "imobiliaria" ? "aluguel recebido" : "receita recebida" : atrasado ? "atrasado" : "pendente"}
                       </Badge>
                       {(papel === "admin" || papel === "financeiro") && <Button
                         type="button"
@@ -272,7 +272,7 @@ export function ContratoDetailPage() {
                         disabled={p.status === "pago" && p.valor_repassado !== null}
                         onClick={() => togglePagamento(p)}
                       >
-                        {p.status === "pago" ? "Marcar pendente" : "Marcar pago"}
+                        {p.status === "pago" ? "Desfazer recebimento" : contrato.tipo === "administracao" && contrato.recebimento_aluguel === "imobiliaria" ? "Registrar aluguel recebido" : "Registrar comissão recebida"}
                       </Button>}
                     </div>
                   </li>

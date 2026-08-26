@@ -9,6 +9,7 @@ const pageNames: Record<string, string> = {
   proprietarios: "Proprietários",
   pessoas: "Clientes",
   contratos: "Contratos",
+  autorizacoes: "Autorizações de administração",
   "modelos-contrato": "Modelos de contrato",
   pagamentos: "Pagamentos",
   "prestacao-contas": "Prestação de contas",

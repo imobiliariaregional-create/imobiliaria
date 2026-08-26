@@ -29,6 +29,7 @@ export function gerarPagamentosIniciais(contrato: {
   data_inicio: string;
   duracao_meses: number | null;
   vigencia_final: string | null;
+  percentual_administracao: number | null;
   percentual_comissao: number | null;
   valor_comissao_fixo: number | null;
   valor_venda: number | null;
@@ -67,8 +68,8 @@ export function gerarPagamentosIniciais(contrato: {
     ];
   }
 
-  // administracao: 10% do aluguel, gerado mensalmente até a vigência final
-  const valorMensal = Number(contrato.valor_aluguel ?? 0) * 0.1;
+  // Administração: comissão configurada sobre o aluguel, gerada mensalmente.
+  const valorMensal = Number(contrato.valor_aluguel ?? 0) * Number(contrato.percentual_administracao ?? 10) / 100;
   const pagamentos: NovoPagamento[] = [];
   const quantidadeMeses = Math.min(Math.max(contrato.duracao_meses ?? 12, 1), LIMITE_MESES);
   for (let i = 0; i < quantidadeMeses; i++) {

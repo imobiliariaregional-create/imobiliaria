@@ -5,6 +5,7 @@ import { PageHeader, EmptyState, LoadingState } from "@/components/ui";
 import { ContratoForm, type ContratoPayload } from "@/components/ContratoForm";
 import type { ImovelPayload } from "@/components/ImovelForm";
 import type { PessoaPayload } from "@/components/PessoaForm";
+import type { ProprietarioPayload } from "@/components/ProprietarioForm";
 import { mapaContratosAtivosPorImovel } from "@/lib/imovelLabel";
 import type { Contrato, Imovel, Pessoa, Proprietario } from "@/lib/types";
 import { useAuth } from "@/lib/auth";
@@ -61,6 +62,13 @@ export function NovoContratoPage() {
     return created;
   }
 
+  async function handleCreateProprietario(data: ProprietarioPayload) {
+    const { data: created, error } = await supabase.from("proprietarios").insert(data).select("*").single<Proprietario>();
+    if (error) throw new Error(error.message);
+    setProprietarios((current) => [...current, created].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")));
+    return created;
+  }
+
   const imoveisDisponiveis = imoveis.filter((imovel) => imovel.status === "disponivel" && !contratosAtivos.has(imovel.id));
 
   const imovelFixo = imovelIdParam ? imoveisDisponiveis.find((i) => i.id === imovelIdParam) : undefined;
@@ -78,6 +86,7 @@ export function NovoContratoPage() {
         contratosAtivosPorImovel={contratosAtivos}
         onCreateImovel={handleCreateImovel}
         onCreatePessoa={handleCreatePessoa}
+        onCreateProprietario={handleCreateProprietario}
       />
     </div>
   );

@@ -4,12 +4,16 @@ import type { Proprietario } from "@/lib/types";
 import { DocumentoInput } from "@/components/DocumentoInput";
 import { applyFormValues, getDraftValue, upper, upperOrNull, useFormDraft, validateCPFCNPJ } from "@/lib/forms";
 import { consultarCNPJ } from "@/lib/cnpj";
+import { PhoneInput } from "@/components/PhoneInput";
+import { PixInput } from "@/components/PixInput";
+
+export type ProprietarioPayload = Omit<Proprietario, "id" | "created_at">;
 
 export function ProprietarioForm({
   onSubmit,
   defaultValues,
 }: {
-  onSubmit: (data: Omit<Proprietario, "id" | "created_at">) => Promise<void>;
+  onSubmit: (data: ProprietarioPayload) => Promise<void>;
   defaultValues?: Partial<Proprietario>;
 }) {
   const draftId = `proprietario:${defaultValues?.id ?? "novo"}`;
@@ -41,6 +45,8 @@ export function ProprietarioForm({
         telefone: (formData.get("telefone") as string) || null,
         email: (formData.get("email") as string) || null,
         chave_pix: upperOrNull(formData.get("chave_pix")),
+        tipo_chave_pix: formData.get("chave_pix") ? formData.get("tipo_chave_pix") as Proprietario["tipo_chave_pix"] : null,
+        titular_conta: upperOrNull(formData.get("titular_conta")),
         observacoes: upperOrNull(formData.get("observacoes")),
         endereco: upperOrNull(formData.get("endereco")),
         rg: tipoPessoa === "fisica" ? upperOrNull(formData.get("rg")) : null,
@@ -121,16 +127,15 @@ export function ProprietarioForm({
         </Field>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Telefone" htmlFor="telefone">
-            <Input id="telefone" name="telefone" defaultValue={defaultValues?.telefone ?? ""} />
-          </Field>
+          <PhoneInput defaultValue={defaultValues?.telefone} />
           <Field label="E-mail" htmlFor="email">
             <Input id="email" name="email" type="email" defaultValue={defaultValues?.email ?? ""} />
           </Field>
         </div>
 
-        <Field label="Chave PIX" htmlFor="chave_pix">
-          <Input id="chave_pix" name="chave_pix" defaultValue={defaultValues?.chave_pix ?? ""} />
+        <PixInput defaultValue={defaultValues?.chave_pix} defaultType={defaultValues?.tipo_chave_pix} draftId={draftId} />
+        <Field label="Nome do titular da conta" htmlFor="titular_conta">
+          <Input id="titular_conta" name="titular_conta" defaultValue={defaultValues?.titular_conta ?? ""} />
         </Field>
 
         <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/40 p-4">

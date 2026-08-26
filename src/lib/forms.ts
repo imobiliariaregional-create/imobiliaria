@@ -34,6 +34,49 @@ export function isValidCEP(value: string) {
   return /^\d{5}-\d{3}$/.test(value);
 }
 
+export function formatPhone(value: string) {
+  const digits = onlyDigits(value).slice(0, 11);
+  if (digits.length <= 2) return digits ? `(${digits}` : "";
+  const ddd = digits.slice(0, 2);
+  const local = digits.slice(2);
+  if (local.length <= 4) return `(${ddd}) ${local}`;
+  const split = local.length > 8 ? 5 : 4;
+  return `(${ddd}) ${local.slice(0, split)}-${local.slice(split)}`;
+}
+
+export function isValidPhone(value: string) {
+  const digits = onlyDigits(value);
+  return /^(?:[1-9]{2})[0-9]{8,9}$/.test(digits);
+}
+
+export type TipoChavePix = "cpf" | "cnpj" | "telefone" | "email" | "aleatoria";
+
+export function inferPixType(value: string): TipoChavePix {
+  if (value.includes("@")) return "email";
+  const digits = onlyDigits(value);
+  if (digits.length === 11 && isValidCPF(value)) return "cpf";
+  if (digits.length === 14 && isValidCNPJ(value)) return "cnpj";
+  if (digits.length === 10 || digits.length === 11) return "telefone";
+  return "aleatoria";
+}
+
+export function formatPixKey(value: string, tipo: TipoChavePix) {
+  if (tipo === "cpf") return formatCPF(value);
+  if (tipo === "cnpj") return formatCNPJ(value);
+  if (tipo === "telefone") return formatPhone(value);
+  if (tipo === "email") return value.trim().toLocaleLowerCase("pt-BR");
+  return value.trim().toLocaleUpperCase("pt-BR").slice(0, 36);
+}
+
+export function isValidPixKey(value: string, tipo: TipoChavePix) {
+  if (!value) return true;
+  if (tipo === "cpf") return isValidCPF(value);
+  if (tipo === "cnpj") return isValidCNPJ(value);
+  if (tipo === "telefone") return isValidPhone(value);
+  if (tipo === "email") return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  return /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i.test(value);
+}
+
 export function parseBRLInput(value: string) {
   const cleaned = value.replace(/[^\d,.-]/g, "").trim();
   if (!cleaned) return null;

@@ -9,6 +9,7 @@ const base = {
   data_inicio: "2026-08-15",
   duracao_meses: 12,
   vigencia_final: "2027-08-15",
+  percentual_administracao: 10,
   percentual_comissao: null,
   valor_comissao_fixo: null,
   valor_venda: null,
@@ -27,6 +28,11 @@ describe("geração de pagamentos", () => {
     const [pagamento] = gerarPagamentosIniciais(base);
     expect(pagamento.valor_bruto).toBe(2_000);
     expect(pagamento.valor).toBe(200);
+  });
+
+  it("respeita o percentual de administração configurado", () => {
+    const [pagamento] = gerarPagamentosIniciais({ ...base, percentual_administracao: 8.5 });
+    expect(pagamento.valor).toBe(170);
   });
 
   it("limita o vencimento ao último dia do mês", () => {
@@ -49,4 +55,3 @@ describe("geração de pagamentos", () => {
     expect(pagamento.valor).toBe(15_000);
   });
 });
-

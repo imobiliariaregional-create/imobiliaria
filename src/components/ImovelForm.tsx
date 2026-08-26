@@ -3,6 +3,9 @@ import { Card, Field, Input, Select, Textarea, Button, Label, ErrorState } from 
 import { CEPInput } from "@/components/CEPInput";
 import type { Imovel, Proprietario } from "@/lib/types";
 import { upper, upperOrNull, useFormDraft } from "@/lib/forms";
+import { Modal } from "@/components/Modal";
+import { ProprietarioForm, type ProprietarioPayload } from "@/components/ProprietarioForm";
+import { Plus } from "lucide-react";
 
 export type ImovelPayload = Omit<Imovel, "id" | "created_at" | "proprietarios">;
 
@@ -10,15 +13,26 @@ export function ImovelForm({
   onSubmit,
   defaultValues,
   proprietarios,
+  onCreateProprietario,
 }: {
   onSubmit: (data: ImovelPayload) => Promise<void>;
   defaultValues?: Partial<Imovel>;
   proprietarios: Proprietario[];
+  onCreateProprietario?: (data: ProprietarioPayload) => Promise<Proprietario>;
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const draftId = `imovel:${defaultValues?.id ?? "novo"}`;
   const { formRef, saveDraft, clearDraft } = useFormDraft(draftId);
+  const [proprietarioId, setProprietarioId] = useState(defaultValues?.proprietario_id ?? "");
+  const [modalProprietario, setModalProprietario] = useState(false);
+
+  async function handleCreateProprietario(data: ProprietarioPayload) {
+    if (!onCreateProprietario) return;
+    const created = await onCreateProprietario(data);
+    setProprietarioId(created.id);
+    setModalProprietario(false);
+  }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -54,8 +68,12 @@ export function ImovelForm({
   return (
     <Card className="p-6 max-w-2xl">
       <form ref={formRef} onSubmit={handleSubmit} onInput={saveDraft} onChange={saveDraft} className="space-y-4">
-        <Field label="Proprietário" htmlFor="proprietario_id">
-          <Select id="proprietario_id" name="proprietario_id" defaultValue={defaultValues?.proprietario_id ?? ""}>
+        <div>
+          <div className="mb-1.5 flex items-center justify-between gap-3">
+            <Label htmlFor="proprietario_id" className="mb-0">Proprietário</Label>
+            {onCreateProprietario && <Button type="button" variant="secondary" className="min-h-8 px-3 py-1 text-xs" onClick={() => setModalProprietario(true)}><Plus size={14} /> Cadastrar proprietário</Button>}
+          </div>
+          <Select id="proprietario_id" name="proprietario_id" value={proprietarioId} onChange={(event) => setProprietarioId(event.target.value)}>
             <option value="">Selecione...</option>
             {proprietarios.map((p) => (
               <option key={p.id} value={p.id}>
@@ -63,7 +81,7 @@ export function ImovelForm({
               </option>
             ))}
           </Select>
-        </Field>
+        </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="sm:col-span-2">
@@ -99,7 +117,7 @@ export function ImovelForm({
           <Field label="Tipo de operação" htmlFor="tipo_operacao">
             <Select id="tipo_operacao" name="tipo_operacao" defaultValue={defaultValues?.tipo_operacao ?? "aluguel"}>
               <option value="aluguel">Aluguel (taxa única)</option>
-              <option value="administracao">Administração (10% mensal)</option>
+              <option value="administracao">Administração (comissão mensal)</option>
               <option value="venda">Venda</option>
             </Select>
           </Field>
@@ -149,6 +167,7 @@ export function ImovelForm({
         {error && <ErrorState message={error} />}
         <Button type="submit" disabled={pending}>{pending ? "Salvando..." : "Salvar"}</Button>
       </form>
+      {onCreateProprietario && <Modal open={modalProprietario} title="Cadastrar proprietário" onClose={() => setModalProprietario(false)}><ProprietarioForm onSubmit={handleCreateProprietario} /></Modal>}
     </Card>
   );
 }
