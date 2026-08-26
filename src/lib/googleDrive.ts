@@ -13,13 +13,28 @@ async function request(body: BodyInit, contentType?: string) {
   return response;
 }
 
-export async function uploadDriveFile(file: File) {
-  const data = new FormData(); data.append("file", file);
+export type DriveCategory = "autorizacao" | "contrato_locacao" | "contrato_venda" | "laudo" | "nota_fiscal" | "papel_timbrado";
+
+export interface DriveUploadOptions {
+  category: DriveCategory;
+  folders?: Array<string | null | undefined>;
+  fileName?: string;
+}
+
+export async function uploadDriveFile(file: File, options: DriveUploadOptions) {
+  const data = new FormData();
+  data.append("file", file);
+  data.append("category", options.category);
+  data.append("folders", JSON.stringify((options.folders ?? []).filter(Boolean)));
+  if (options.fileName) data.append("fileName", options.fileName);
   return request(data).then((response) => response.json() as Promise<{ id: string; name: string; mimeType: string; size: string }>);
 }
-export async function downloadDriveFile(fileId: string, fileName: string, mimeType?: string | null) {
+export async function getDriveFileBlob(fileId: string, mimeType?: string | null) {
   const response = await request(JSON.stringify({ action: "download", fileId, mimeType }), "application/json");
-  const url = URL.createObjectURL(await response.blob());
+  return response.blob();
+}
+export async function downloadDriveFile(fileId: string, fileName: string, mimeType?: string | null) {
+  const url = URL.createObjectURL(await getDriveFileBlob(fileId, mimeType));
   const anchor = document.createElement("a"); anchor.href = url; anchor.download = fileName; anchor.click(); URL.revokeObjectURL(url);
 }
-export async function deleteDriveFile(fileId: string) { await request(JSON.stringify({ action: "delete", fileId }), "application/json"); }
+export async function deleteDriveFile(fileId: string, category: DriveCategory = "autorizacao") { await request(JSON.stringify({ action: "delete", fileId, category }), "application/json"); }

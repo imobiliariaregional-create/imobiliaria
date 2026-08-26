@@ -4,11 +4,12 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader, Card, Button, Field, Select, Input, Badge, Textarea, LoadingState } from "@/components/ui";
 import { ContratoForm, type ContratoPayload } from "@/components/ContratoForm";
 import { formatBRL, formatDate, formatMonth, todayISO, addDaysISO, diffDiasISO } from "@/lib/format";
-import { imovelLabel, mapaContratosAtivosPorImovel } from "@/lib/imovelLabel";
+import { enderecoImovel, imovelLabel, mapaContratosAtivosPorImovel } from "@/lib/imovelLabel";
 import type { Contrato, Imovel, Pessoa, PagamentoMensal, LaudoVistoria, NotaFiscal } from "@/lib/types";
 import { confirmDeletion } from "@/lib/actions";
 import { useAuth } from "@/lib/auth";
 import { upperOrNull, useFormDraft } from "@/lib/forms";
+import { deleteDriveFile, downloadDriveFile, uploadDriveFile } from "@/lib/googleDrive";
 
 const tipoLabel: Record<string, string> = {
   aluguel: "Aluguel",
@@ -112,8 +113,11 @@ export function ContratoDetailPage() {
     if (!contrato) return;
     if (!confirmDeletion("Excluir este contrato, seus pagamentos, laudos e documento gerado?")) return;
     const caminhos = laudos.flatMap((laudo) => laudo.arquivo_url ? [laudo.arquivo_url] : []);
+    const { data: documento } = await supabase.from("contratos_gerados").select("drive_file_id").eq("contrato_id", id).maybeSingle<{ drive_file_id: string | null }>();
     const { error } = await supabase.from("contratos").delete().eq("id", id);
     if (error) throw new Error(error.message);
+    await Promise.allSettled(laudos.filter((laudo) => laudo.drive_file_id).map((laudo) => deleteDriveFile(laudo.drive_file_id!, "laudo")));
+    if (documento?.drive_file_id) await deleteDriveFile(documento.drive_file_id, contrato.tipo === "venda" ? "contrato_venda" : "contrato_locacao");
     if (caminhos.length > 0) await supabase.storage.from("laudos-vistoria").remove(caminhos);
     navigate(`/imoveis/${contrato.imovel_id}`);
   }
@@ -143,17 +147,15 @@ export function ContratoDetailPage() {
     const observacoes = upperOrNull(formData.get("observacoes"));
     const arquivo = formData.get("arquivo") as File | null;
 
-    let arquivo_url: string | null = null;
+    let uploaded: Awaited<ReturnType<typeof uploadDriveFile>> | null = null;
     if (arquivo && arquivo.size > 0) {
-      const nomeArquivo = `${id}/${Date.now()}-${arquivo.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from("laudos-vistoria")
-        .upload(nomeArquivo, arquivo, { contentType: arquivo.type });
-      if (uploadError) {
-        alert(uploadError.message);
-        return;
-      }
-      arquivo_url = nomeArquivo;
+      try {
+        uploaded = await uploadDriveFile(arquivo, {
+          category: "laudo",
+          folders: [data.slice(0, 4), `${contrato?.numero_contrato ?? "SEM NUMERO"} - ${contrato?.imoveis ? enderecoImovel(contrato.imoveis) : "IMOVEL"}`],
+          fileName: `LAUDO ${tipo.toUpperCase()} - ${data}`,
+        });
+      } catch (error) { alert(error instanceof Error ? error.message : "Erro ao enviar laudo."); return; }
     }
 
     const { error } = await supabase.from("laudos_vistoria").insert({
@@ -161,10 +163,14 @@ export function ContratoDetailPage() {
       tipo,
       data,
       observacoes,
-      arquivo_url,
+      arquivo_url: null,
+      drive_file_id: uploaded?.id ?? null,
+      drive_file_name: uploaded?.name ?? null,
+      drive_mime_type: uploaded?.mimeType ?? null,
+      drive_file_size: uploaded ? Number(uploaded.size) : null,
     });
     if (error) {
-      if (arquivo_url) await supabase.storage.from("laudos-vistoria").remove([arquivo_url]);
+      if (uploaded) await deleteDriveFile(uploaded.id, "laudo");
       alert(error.message);
       return;
     }
@@ -180,6 +186,7 @@ export function ContratoDetailPage() {
       alert(error.message);
       return;
     }
+    if (laudo.drive_file_id) await deleteDriveFile(laudo.drive_file_id, "laudo");
     if (laudo.arquivo_url) await supabase.storage.from("laudos-vistoria").remove([laudo.arquivo_url]);
     reload();
   }
@@ -306,7 +313,7 @@ export function ContratoDetailPage() {
                 </Field>
               </div>
               <div className="col-span-2">
-                <Field label="Arquivo (PDF/imagem, opcional)" htmlFor="arquivo_laudo">
+                <Field label="Arquivo no Google Drive (PDF/imagem, opcional)" htmlFor="arquivo_laudo">
                   <input type="file" id="arquivo_laudo" name="arquivo" accept=".pdf,image/*" className="text-sm" />
                 </Field>
               </div>
@@ -323,7 +330,9 @@ export function ContratoDetailPage() {
                   <div>
                     <Badge color="blue">{l.tipo === "entrada" ? "Entrada" : l.tipo === "saida" ? "Saída" : "Renovação"}</Badge>
                     <span className="ml-2 text-slate-700">{formatDate(l.data)}</span>
-                    {laudoUrls[l.id] && (
+                    {l.drive_file_id && l.drive_file_name ? (
+                      <button type="button" onClick={() => downloadDriveFile(l.drive_file_id!, l.drive_file_name!, l.drive_mime_type)} className="ml-2 text-brand-700 hover:underline">baixar do Drive</button>
+                    ) : laudoUrls[l.id] && (
                       <a href={laudoUrls[l.id]} target="_blank" rel="noreferrer" className="ml-2 text-brand-700 hover:underline">
                         ver arquivo
                       </a>
@@ -356,7 +365,9 @@ export function ContratoDetailPage() {
                   <span>
                     {n.numero ?? "s/n"} · {formatBRL(n.valor)} · {formatDate(n.data_emissao)}
                   </span>
-                  {notaUrls[n.id] && (
+                  {n.drive_file_id && n.drive_file_name ? (
+                    <button type="button" onClick={() => downloadDriveFile(n.drive_file_id!, n.drive_file_name!, n.drive_mime_type)} className="text-brand-700 hover:underline">baixar do Drive</button>
+                  ) : notaUrls[n.id] && (
                     <a href={notaUrls[n.id]} target="_blank" rel="noreferrer" className="text-brand-700 hover:underline">
                       ver arquivo
                     </a>

@@ -9,6 +9,7 @@ import type { Imovel, Proprietario, Contrato, ContaConsumo } from "@/lib/types";
 import { confirmDeletion } from "@/lib/actions";
 import { useAuth } from "@/lib/auth";
 import { useFormDraft } from "@/lib/forms";
+import { deleteDriveFile } from "@/lib/googleDrive";
 
 export function ImovelDetailPage() {
   const { papel } = useAuth();
@@ -59,11 +60,16 @@ export function ImovelDetailPage() {
     if (!confirmDeletion("Excluir este imóvel e todos os contratos, pagamentos e laudos vinculados?")) return;
     const contratoIds = contratos.map((contrato) => contrato.id);
     const { data: arquivos } = contratoIds.length > 0
-      ? await supabase.from("laudos_vistoria").select("arquivo_url").in("contrato_id", contratoIds).not("arquivo_url", "is", null)
-      : { data: [] as { arquivo_url: string | null }[] };
+      ? await supabase.from("laudos_vistoria").select("arquivo_url, drive_file_id").in("contrato_id", contratoIds)
+      : { data: [] as { arquivo_url: string | null; drive_file_id: string | null }[] };
+    const { data: documentos } = contratoIds.length > 0
+      ? await supabase.from("contratos_gerados").select("drive_file_id").in("contrato_id", contratoIds).not("drive_file_id", "is", null)
+      : { data: [] as { drive_file_id: string | null }[] };
     const { error } = await supabase.from("imoveis").delete().eq("id", id);
     if (error) throw new Error(error.message);
     const caminhos = (arquivos ?? []).flatMap((item) => item.arquivo_url ? [item.arquivo_url] : []);
+    await Promise.allSettled((arquivos ?? []).filter((item) => item.drive_file_id).map((item) => deleteDriveFile(item.drive_file_id!, "laudo")));
+    await Promise.allSettled((documentos ?? []).filter((item) => item.drive_file_id).map((item) => deleteDriveFile(item.drive_file_id!, "contrato_locacao")));
     if (caminhos.length > 0) await supabase.storage.from("laudos-vistoria").remove(caminhos);
     navigate("/imoveis");
   }

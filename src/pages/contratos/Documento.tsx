@@ -5,10 +5,11 @@ import { PageHeader, Card, Field, Select, Button, Badge, LoadingState, ErrorStat
 import { ClausulasEditor } from "@/components/ClausulasEditor";
 import { DocumentoContratoView } from "@/components/DocumentoContratoView";
 import { resolverPlaceholders, substituirPlaceholders } from "@/lib/placeholders";
-import { imovelLabel } from "@/lib/imovelLabel";
+import { enderecoImovel, imovelLabel } from "@/lib/imovelLabel";
 import { fetchLetterheadDataUrl } from "@/lib/letterhead";
-import { exportContratoPDF, exportContratoDocx, gerarContratoPdfBase64 } from "@/lib/exportContrato";
-import { enviarParaAssinatura, consultarStatusAssinatura, baixarDocumentoAssinado, STATUS_LABEL } from "@/lib/assinafy";
+import { downloadBlob, exportContratoDocx, gerarContratoPdfBase64, gerarContratoPdfBlob } from "@/lib/exportContrato";
+import { enviarParaAssinatura, consultarStatusAssinatura, obterDocumentoAssinado, STATUS_LABEL } from "@/lib/assinafy";
+import { deleteDriveFile, downloadDriveFile, uploadDriveFile, type DriveUploadOptions } from "@/lib/googleDrive";
 import type { ClausulaDocumento, Contrato, ContratoGerado, ModeloContrato } from "@/lib/types";
 
 export function ContratoDocumentoPage() {
@@ -125,7 +126,10 @@ export function ContratoDocumentoPage() {
     setError(null);
     try {
       const letterheadDataUrl = await fetchLetterheadDataUrl();
-      exportContratoPDF(clausulas, { numeroContrato: contrato?.numero_contrato, letterheadDataUrl });
+      const blob = gerarContratoPdfBlob(clausulas, { letterheadDataUrl });
+      const fileName = `CONTRATO${contrato?.numero_contrato ? " " + contrato.numero_contrato.replace("/", "-") : ""}.pdf`;
+      await salvarArquivoNoDrive(blob, fileName);
+      downloadBlob(blob, fileName);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao exportar PDF.");
     } finally {
@@ -212,12 +216,37 @@ export function ContratoDocumentoPage() {
     setError(null);
     try {
       const fileName = `contrato${contrato?.numero_contrato ? "-" + contrato.numero_contrato.replace("/", "-") : ""}-assinado.pdf`;
-      await baixarDocumentoAssinado(gerado.assinafy_document_id, "certificated", fileName);
+      const blob = await obterDocumentoAssinado(gerado.assinafy_document_id, "certificated");
+      await salvarArquivoNoDrive(blob, fileName);
+      downloadBlob(blob, fileName);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao baixar documento assinado.");
     } finally {
       setAssinaturaPending(false);
     }
+  }
+
+  function driveOptions(): DriveUploadOptions {
+    const owner = contrato?.imoveis?.proprietarios?.nome ?? "SEM PROPRIETARIO";
+    const address = contrato?.imoveis ? enderecoImovel(contrato.imoveis) : "SEM ENDERECO";
+    const number = contrato?.numero_contrato ?? "SEM NUMERO";
+    const person = contrato?.pessoas?.nome ?? "SEM PESSOA";
+    const year = contrato?.data_inicio?.slice(0, 4) ?? new Date().getFullYear().toString();
+    if (contrato?.tipo === "venda") return { category: "contrato_venda", folders: [year, `${number} - ${person} - ${address}`] };
+    if (contrato?.tipo === "administracao") return { category: "contrato_locacao", folders: ["IMOVEIS ADMINISTRADOS", owner, address, number] };
+    return { category: "contrato_locacao", folders: ["LOCACOES AVULSAS", year, `${number} - ${person} - ${address}`] };
+  }
+
+  async function salvarArquivoNoDrive(blob: Blob, fileName: string) {
+    if (!gerado) throw new Error("Gere o documento antes de salvá-lo.");
+    const uploaded = await uploadDriveFile(new File([blob], fileName, { type: blob.type || "application/pdf" }), { ...driveOptions(), fileName });
+    const { data, error } = await supabase.from("contratos_gerados").update({
+      drive_file_id: uploaded.id, drive_file_name: uploaded.name, drive_mime_type: uploaded.mimeType, drive_file_size: Number(uploaded.size),
+    }).eq("id", gerado.id).select("*").single<ContratoGerado>();
+    if (error) { await deleteDriveFile(uploaded.id, driveOptions().category); throw new Error(error.message); }
+    const previousId = gerado.drive_file_id;
+    setGerado(data);
+    if (previousId && previousId !== uploaded.id) await deleteDriveFile(previousId, driveOptions().category);
   }
 
   if (contrato === undefined || gerado === undefined) return <LoadingState />;
@@ -261,11 +290,16 @@ export function ContratoDocumentoPage() {
               Imprimir
             </Button>
             <Button type="button" variant="secondary" onClick={exportarPDF} disabled={exportando !== null}>
-              {exportando === "pdf" ? "Exportando..." : "Exportar PDF"}
+              {exportando === "pdf" ? "Salvando no Drive..." : "Exportar PDF e salvar no Drive"}
             </Button>
             <Button type="button" variant="secondary" onClick={exportarWord} disabled={exportando !== null}>
               {exportando === "docx" ? "Exportando..." : "Exportar Word"}
             </Button>
+            {gerado.drive_file_id && gerado.drive_file_name && (
+              <Button type="button" variant="secondary" onClick={() => downloadDriveFile(gerado.drive_file_id!, gerado.drive_file_name!, gerado.drive_mime_type)}>
+                Baixar arquivo salvo no Drive
+              </Button>
+            )}
           </div>
           {error && <ErrorState message={error} />}
 

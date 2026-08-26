@@ -94,7 +94,10 @@ function AuthorizationForm({ value, owners, properties, onSaved }: { value?: Aut
       if (!selected.length) throw new Error("Selecione pelo menos um imóvel.");
       const form = new FormData(event.currentTarget);
       const file = form.get("arquivo");
-      if (file instanceof File && file.size) uploaded = await uploadDriveFile(file);
+      if (file instanceof File && file.size) uploaded = await uploadDriveFile(file, {
+        category: "autorizacao",
+        folders: [owners.find((owner) => owner.id === ownerId)?.nome, upperOrNull(form.get("numero")) ?? "SEM NUMERO"],
+      });
       const payload = {
         proprietario_id: ownerId, numero: upperOrNull(form.get("numero")), data_inicio: String(form.get("data_inicio")), data_fim: String(form.get("data_fim") || "") || null,
         status: String(form.get("status")) as StatusAutorizacao, observacoes: upperOrNull(form.get("observacoes")),

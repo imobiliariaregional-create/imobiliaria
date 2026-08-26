@@ -1,6 +1,23 @@
-# Google Drive para contratos de autorização
+# Google Drive para os documentos do sistema
 
-Os anexos da área **Autorizações** não são salvos no banco. O Supabase guarda somente o ID, nome, tipo e tamanho do arquivo; o conteúdo fica na pasta privada escolhida no Google Drive.
+Novos contratos, autorizações, laudos, notas fiscais e o papel timbrado não são salvos no Storage do Supabase. O banco guarda somente o ID, nome, tipo e tamanho; o conteúdo fica na pasta privada escolhida no Google Drive. Anexos antigos continuam disponíveis durante a transição.
+
+## Organização automática
+
+Dentro da pasta indicada por `GOOGLE_DRIVE_FOLDER_ID`, o sistema cria:
+
+```text
+01 - AUTORIZACOES DE ADMINISTRACAO
+02 - CONTRATOS DE LOCACAO
+   ├── IMOVEIS ADMINISTRADOS
+   └── LOCACOES AVULSAS
+03 - CONTRATOS DE VENDA
+04 - LAUDOS DE VISTORIA
+05 - NOTAS FISCAIS
+06 - PAPEL TIMBRADO
+```
+
+As subpastas de ano, mês, proprietário, imóvel e número do contrato são criadas quando o primeiro arquivo daquela classificação é enviado. A pasta-raiz pode ser renomeada ou movida no Google Drive sem alterar a configuração, pois o ID permanece o mesmo.
 
 ## Configuração única
 
@@ -20,6 +37,6 @@ Os anexos da área **Autorizações** não são salvos no banco. O Supabase guar
    npx supabase functions deploy google-drive
    ```
 
-Nunca coloque client secret ou refresh token no `.env` do frontend. A pasta também não precisa ser pública: uploads, downloads e exclusões passam pela Edge Function autenticada.
+Nunca coloque client secret ou refresh token no `.env` do frontend. A pasta também não precisa ser pública: uploads, downloads e exclusões passam pela Edge Function autenticada. O limite de cada arquivo no sistema é 15 MB.
 
 Se for usar uma service account, a pasta deve estar em um **Shared Drive**; contas de serviço não possuem cota própria para serem donas de arquivos em “Meu Drive”. Para uma conta Google comum, use o fluxo OAuth descrito acima.

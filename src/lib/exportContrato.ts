@@ -120,8 +120,11 @@ export function exportContratoPDF(
   clausulas: ClausulaDocumento[],
   opts: { numeroContrato?: string | null; letterheadDataUrl?: string | null }
 ) {
-  const doc = criarDocumentoPDF(clausulas, opts);
-  doc.save(nomeArquivo(opts.numeroContrato, "pdf"));
+  downloadBlob(gerarContratoPdfBlob(clausulas, opts), nomeArquivo(opts.numeroContrato, "pdf"));
+}
+
+export function gerarContratoPdfBlob(clausulas: ClausulaDocumento[], opts: { letterheadDataUrl?: string | null }): Blob {
+  return criarDocumentoPDF(clausulas, opts).output("blob");
 }
 
 /** Gera o mesmo PDF em base64 (sem disparar download) — usado para enviar para assinatura digital. */
@@ -156,6 +159,13 @@ const LINE_1_5 = { line: 360, lineRule: "auto" as const }; // 360/240 = 1,5
 export async function exportContratoDocx(
   clausulas: ClausulaDocumento[],
   opts: { numeroContrato?: string | null; letterheadDataUrl?: string | null }
+) {
+  downloadBlob(await gerarContratoDocxBlob(clausulas, opts), nomeArquivo(opts.numeroContrato, "docx"));
+}
+
+export async function gerarContratoDocxBlob(
+  clausulas: ClausulaDocumento[],
+  opts: { letterheadDataUrl?: string | null }
 ) {
   const children: Paragraph[] = [];
 
@@ -197,11 +207,14 @@ export async function exportContratoDocx(
     ],
   });
 
-  const blob = await Packer.toBlob(doc);
+  return Packer.toBlob(doc);
+}
+
+export function downloadBlob(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = nomeArquivo(opts.numeroContrato, "docx");
+  a.download = fileName;
   a.click();
   URL.revokeObjectURL(url);
 }

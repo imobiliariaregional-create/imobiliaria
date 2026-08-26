@@ -8,6 +8,7 @@ import { confirmDeletion } from "@/lib/actions";
 import { useAuth } from "@/lib/auth";
 import { normalizeSearch } from "@/lib/forms";
 import { enderecoImovel } from "@/lib/imovelLabel";
+import { deleteDriveFile, downloadDriveFile } from "@/lib/googleDrive";
 
 const tipoLabel = { aluguel: "Aluguel", administracao: "Administração", venda: "Venda", avulsa: "Sem contrato" };
 
@@ -57,6 +58,7 @@ export function NotasFiscaisListPage() {
       alert(error.message);
       return;
     }
+    if (nota.drive_file_id) await deleteDriveFile(nota.drive_file_id, "nota_fiscal");
     if (nota.arquivo_url) await supabase.storage.from("notas-fiscais").remove([nota.arquivo_url]);
     reload();
   }
@@ -99,7 +101,11 @@ export function NotasFiscaisListPage() {
                     )}
                   </Td>
                   <Td>
-                    {urls[nota.id] ? (
+                    {nota.drive_file_id && nota.drive_file_name ? (
+                      <button type="button" onClick={() => downloadDriveFile(nota.drive_file_id!, nota.drive_file_name!, nota.drive_mime_type)} className="text-brand-700 hover:underline">
+                        baixar do Drive
+                      </button>
+                    ) : urls[nota.id] ? (
                       <a href={urls[nota.id]} target="_blank" rel="noreferrer" className="text-brand-700 hover:underline">
                         ver arquivo
                       </a>

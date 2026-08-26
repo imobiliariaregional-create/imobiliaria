@@ -44,12 +44,16 @@ export function consultarStatusAssinatura(documentId: string): Promise<StatusRes
   return invocar<StatusResultado>({ action: "status", documentId });
 }
 
-export async function baixarDocumentoAssinado(documentId: string, artifactName: string, fileName: string): Promise<void> {
+export async function obterDocumentoAssinado(documentId: string, artifactName: string): Promise<Blob> {
   const { base64 } = await invocar<{ base64: string }>({ action: "baixar", documentId, artifactName });
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  const blob = new Blob([bytes], { type: "application/pdf" });
+  return new Blob([bytes], { type: "application/pdf" });
+}
+
+export async function baixarDocumentoAssinado(documentId: string, artifactName: string, fileName: string): Promise<void> {
+  const blob = await obterDocumentoAssinado(documentId, artifactName);
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

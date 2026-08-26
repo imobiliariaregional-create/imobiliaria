@@ -7,6 +7,7 @@ import { CurrencyInput } from "@/components/CurrencyInput";
 import type { Contrato, PagamentoMensal } from "@/lib/types";
 import { useAuth } from "@/lib/auth";
 import { upperOrNull, useFormDraft } from "@/lib/forms";
+import { deleteDriveFile, uploadDriveFile } from "@/lib/googleDrive";
 
 export function NovaNotaFiscalPage() {
   const { papel, perfilLoading } = useAuth();
@@ -48,14 +49,10 @@ export function NovaNotaFiscalPage() {
     const arquivo = formData.get("arquivo") as File | null;
 
     try {
-      let arquivo_url: string | null = null;
+      let uploaded: Awaited<ReturnType<typeof uploadDriveFile>> | null = null;
       if (arquivo && arquivo.size > 0) {
-        const nomeArquivo = `${Date.now()}-${arquivo.name}`;
-        const { error: uploadError } = await supabase.storage
-          .from("notas-fiscais")
-          .upload(nomeArquivo, arquivo, { contentType: arquivo.type });
-        if (uploadError) throw new Error(uploadError.message);
-        arquivo_url = nomeArquivo;
+        const [ano, mes] = data_emissao.split("-");
+        uploaded = await uploadDriveFile(arquivo, { category: "nota_fiscal", folders: [ano, mes], fileName: numero ? `NF ${numero}` : undefined });
       }
 
       const { error } = await supabase.from("notas_fiscais").insert({
@@ -65,10 +62,14 @@ export function NovaNotaFiscalPage() {
         descricao,
         contrato_id,
         pagamento_mensal_id,
-        arquivo_url,
+        arquivo_url: null,
+        drive_file_id: uploaded?.id ?? null,
+        drive_file_name: uploaded?.name ?? null,
+        drive_mime_type: uploaded?.mimeType ?? null,
+        drive_file_size: uploaded ? Number(uploaded.size) : null,
       });
       if (error) {
-        if (arquivo_url) await supabase.storage.from("notas-fiscais").remove([arquivo_url]);
+        if (uploaded) await deleteDriveFile(uploaded.id, "nota_fiscal");
         throw new Error(error.message);
       }
 
@@ -134,7 +135,7 @@ export function NovaNotaFiscalPage() {
           <Field label="Descrição" htmlFor="descricao">
             <Textarea id="descricao" name="descricao" rows={3} />
           </Field>
-          <Field label="Arquivo (PDF/imagem, opcional)" htmlFor="arquivo">
+          <Field label="Arquivo no Google Drive (PDF/imagem, opcional)" htmlFor="arquivo">
             <input type="file" id="arquivo" name="arquivo" accept=".pdf,image/*" className="text-sm" />
           </Field>
           {error && <ErrorState message={error} />}

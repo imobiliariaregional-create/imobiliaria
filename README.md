@@ -2,7 +2,7 @@
 
 Sistema interno de controle para a imobiliária: imóveis, proprietários, inquilinos/compradores, contratos (aluguel, administração e venda), pagamentos mensais recebidos pela imobiliária, contas de água/energia, laudos de vistoria e notas fiscais.
 
-**Arquitetura:** SPA (React + Vite) 100% client-side, hospedada como site estático no GitHub Pages. Não há servidor — o navegador fala diretamente com o Supabase (banco, autenticação e arquivos), e a segurança dos dados é garantida pelas políticas de RLS do Postgres.
+**Arquitetura:** SPA (React + Vite) hospedada no GitHub Pages. O Supabase mantém banco, autenticação, permissões e metadados; os documentos ficam no Google Drive privado por meio de uma Edge Function autenticada.
 
 ## Como funciona a parte financeira
 
@@ -15,7 +15,7 @@ Todos esses valores aparecem na tela **Pagamentos**, que serve como o controle d
 ## 1. Criar o projeto no Supabase
 
 1. Acesse [supabase.com](https://supabase.com) e crie um novo projeto (grátis).
-2. Em **SQL Editor**, execute **todos** os arquivos de [`supabase/migrations/`](supabase/migrations/) na ordem do nome (`0001` até `0007` e, por último, a migração datada). Eles criam o schema completo, as permissões, as operações transacionais e os buckets de arquivos. Não publique uma versão nova do frontend antes de aplicar as migrações correspondentes.
+2. Em **SQL Editor**, execute **todos** os arquivos de [`supabase/migrations/`](supabase/migrations/) na ordem do nome. Eles criam o schema completo, as permissões e as operações transacionais. Não publique uma versão nova do frontend antes de aplicar as migrações correspondentes.
 3. Em **Authentication → Users**, clique em **Add user** para criar o login de cada funcionário (e-mail + senha). Não há tela de cadastro pública. Usuários novos recebem o papel `corretor`; um administrador pode alterar `public.perfis.papel` para `admin`, `financeiro` ou `corretor`.
 4. Em **Project Settings → API**, copie a **Project URL** e a **anon public key** (nunca a `service_role`/secret key — essa não é usada neste projeto e não deve ficar em nenhum arquivo do repositório).
 
@@ -72,7 +72,9 @@ Se o nome do repositório não for `imobiliaria`, ajuste a constante `REPO_NAME`
 - `src/lib/supabase.ts` — client do Supabase usado no navegador.
 - `src/lib/auth.tsx` — contexto de sessão e rota protegida.
 - `src/lib/pagamentos.ts` — regra de geração automática dos pagamentos mensais/únicos por tipo de contrato.
+- `src/lib/googleDrive.ts` — acesso autenticado aos documentos no Google Drive.
 - `supabase/migrations/` — histórico completo e ordenado do schema do banco.
+- `supabase/functions/google-drive/` — criação de pastas, upload, download e exclusão no Drive.
 - `.github/workflows/deploy.yml` — build e publicação automática no GitHub Pages.
 
 ## Próximos passos possíveis (fora do escopo desta versão)

@@ -18,7 +18,9 @@ async function requireUser(req: Request) {
   return profiles[0]?.papel as string | undefined;
 }
 
+let cachedToken: { value: string; expiresAt: number } | null = null;
 async function accessToken() {
+  if (cachedToken && cachedToken.expiresAt > Date.now() + 60_000) return cachedToken.value;
   const clientId = Deno.env.get("GOOGLE_CLIENT_ID");
   const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET");
   const refreshToken = Deno.env.get("GOOGLE_REFRESH_TOKEN");
@@ -26,7 +28,8 @@ async function accessToken() {
   const response = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, refresh_token: refreshToken, grant_type: "refresh_token" }) });
   const body = await response.json();
   if (!response.ok || !body.access_token) throw new Error(body.error_description || "Não foi possível autenticar no Google Drive.");
-  return body.access_token as string;
+  cachedToken = { value: body.access_token as string, expiresAt: Date.now() + Number(body.expires_in ?? 3600) * 1000 };
+  return cachedToken.value;
 }
 
 async function googleFetch(path: string, init: RequestInit = {}) {
@@ -35,12 +38,48 @@ async function googleFetch(path: string, init: RequestInit = {}) {
   return response;
 }
 
-async function upload(file: File) {
-  const folderId = Deno.env.get("GOOGLE_DRIVE_FOLDER_ID");
-  if (!folderId) throw new Error("GOOGLE_DRIVE_FOLDER_ID não configurada.");
+const categoryFolders: Record<string, string[]> = {
+  autorizacao: ["01 - AUTORIZACOES DE ADMINISTRACAO"],
+  contrato_locacao: ["02 - CONTRATOS DE LOCACAO"],
+  contrato_venda: ["03 - CONTRATOS DE VENDA"],
+  laudo: ["04 - LAUDOS DE VISTORIA"],
+  nota_fiscal: ["05 - NOTAS FISCAIS"],
+  papel_timbrado: ["06 - PAPEL TIMBRADO"],
+};
+
+function cleanName(value: string, fallback = "SEM IDENTIFICACAO") {
+  const cleaned = value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[\\/?%*:|"<>]/g, "-").replace(/\s+/g, " ").trim().replace(/^\.+|\.+$/g, "");
+  return (cleaned || fallback).slice(0, 120);
+}
+function allowed(role: string | undefined, category: string) {
+  if (role === "admin") return true;
+  if (category === "nota_fiscal") return role === "financeiro";
+  return role === "corretor" && category !== "papel_timbrado";
+}
+function escapeQuery(value: string) { return value.replace(/\\/g, "\\\\").replace(/'/g, "\\'"); }
+async function ensureFolder(parentId: string, rawName: string) {
+  const name = cleanName(rawName);
+  const q = encodeURIComponent(`name = '${escapeQuery(name)}' and '${parentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`);
+  const found = await (await googleFetch(`/drive/v3/files?q=${q}&fields=files(id,name)&pageSize=1`)).json();
+  if (found.files?.[0]?.id) return found.files[0].id as string;
+  const created = await (await googleFetch("/drive/v3/files?fields=id,name", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, mimeType: "application/vnd.google-apps.folder", parents: [parentId] }) })).json();
+  return created.id as string;
+}
+async function targetFolder(category: string, folders: string[]) {
+  let parentId = Deno.env.get("GOOGLE_DRIVE_FOLDER_ID");
+  if (!parentId) throw new Error("GOOGLE_DRIVE_FOLDER_ID não configurada.");
+  const parts = [...(categoryFolders[category] ?? []), ...folders].slice(0, 8);
+  for (const part of parts) parentId = await ensureFolder(parentId, part);
+  return parentId;
+}
+
+async function upload(file: File, category: string, folders: string[], requestedName?: string) {
+  const folderId = await targetFolder(category, folders);
   if (file.size > 15 * 1024 * 1024) throw new HttpError("O anexo deve ter no máximo 15 MB.");
   const boundary = `regional_${crypto.randomUUID()}`;
-  const metadata = JSON.stringify({ name: file.name, parents: [folderId] });
+  const originalExtension = file.name.includes(".") ? `.${file.name.split(".").pop()}` : "";
+  const requestedHasExtension = requestedName?.includes(".");
+  const metadata = JSON.stringify({ name: cleanName(requestedName ? `${requestedName}${requestedHasExtension ? "" : originalExtension}` : file.name, "ARQUIVO"), parents: [folderId] });
   const prefix = new TextEncoder().encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: ${file.type || "application/octet-stream"}\r\n\r\n`);
   const suffix = new TextEncoder().encode(`\r\n--${boundary}--`);
   const bytes = new Uint8Array(prefix.length + file.size + suffix.length);
@@ -54,15 +93,21 @@ Deno.serve(async (req) => {
   try {
     const role = await requireUser(req);
     if ((req.headers.get("content-type") ?? "").includes("multipart/form-data")) {
-      if (!role || !["admin", "corretor"].includes(role)) throw new HttpError("Sem permissão para enviar contratos de autorização.", 403);
-      const file = (await req.formData()).get("file");
+      const form = await req.formData();
+      const file = form.get("file");
+      const category = String(form.get("category") || "");
+      if (!categoryFolders[category]) throw new HttpError("Categoria de documento inválida.");
+      if (!allowed(role, category)) throw new HttpError("Sem permissão para enviar este tipo de documento.", 403);
       if (!(file instanceof File)) throw new HttpError("Selecione um arquivo.");
-      return json(await upload(file));
+      let folders: string[] = [];
+      try { folders = JSON.parse(String(form.get("folders") || "[]")); } catch { throw new HttpError("Organização de pastas inválida."); }
+      if (!Array.isArray(folders) || folders.some((item) => typeof item !== "string")) throw new HttpError("Organização de pastas inválida.");
+      return json(await upload(file, category, folders, String(form.get("fileName") || "") || undefined));
     }
     const body = await req.json();
     if (!body.fileId) throw new HttpError("Arquivo não informado.");
     if (body.action === "delete") {
-      if (!role || !["admin", "corretor"].includes(role)) throw new HttpError("Sem permissão para excluir contratos de autorização.", 403);
+      if (!allowed(role, String(body.category || "autorizacao"))) throw new HttpError("Sem permissão para excluir este documento.", 403);
       await googleFetch(`/drive/v3/files/${encodeURIComponent(body.fileId)}`, { method: "DELETE" }); return json({ ok: true });
     }
     if (body.action === "download") {

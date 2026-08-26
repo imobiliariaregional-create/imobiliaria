@@ -138,6 +138,10 @@ export interface LaudoVistoria {
   tipo: TipoLaudo;
   data: string;
   arquivo_url: string | null;
+  drive_file_id: string | null;
+  drive_file_name: string | null;
+  drive_mime_type: string | null;
+  drive_file_size: number | null;
   observacoes: string | null;
   created_at: string;
   contratos?: Contrato | null;
@@ -150,6 +154,10 @@ export interface NotaFiscal {
   data_emissao: string;
   descricao: string | null;
   arquivo_url: string | null;
+  drive_file_id: string | null;
+  drive_file_name: string | null;
+  drive_mime_type: string | null;
+  drive_file_size: number | null;
   contrato_id: string | null;
   pagamento_mensal_id: string | null;
   created_at: string;
@@ -180,6 +188,19 @@ export interface ContratoGerado {
   assinafy_assignment_id: string | null;
   assinafy_status: string | null;
   assinafy_resumo: { signer_count: number; completed_count: number } | null;
+  drive_file_id: string | null;
+  drive_file_name: string | null;
+  drive_mime_type: string | null;
+  drive_file_size: number | null;
+}
+
+export interface ConfiguracaoDocumentos {
+  id: boolean;
+  papel_timbrado_drive_file_id: string | null;
+  papel_timbrado_drive_file_name: string | null;
+  papel_timbrado_drive_mime_type: string | null;
+  papel_timbrado_drive_file_size: number | null;
+  updated_at: string;
 }
 
 export interface AutorizacaoAdministracao {
