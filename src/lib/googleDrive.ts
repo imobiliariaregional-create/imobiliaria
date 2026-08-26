@@ -3,7 +3,10 @@ import { supabase } from "@/lib/supabase";
 async function request(body: BodyInit, contentType?: string) {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error("Sua sessão expirou. Entre novamente.");
-  const headers: Record<string, string> = { Authorization: `Bearer ${session.access_token}` };
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${session.access_token}`,
+    apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+  };
   if (contentType) headers["Content-Type"] = contentType;
   const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-drive`, { method: "POST", headers, body });
   if (!response.ok) { const result = await response.json().catch(() => ({})); throw new Error(result.error || "Falha na integração com o Google Drive."); }
