@@ -1,3 +1,4 @@
+# Publicação automática do sistema
 name: Deploy no GitHub Pages
 
 on:
