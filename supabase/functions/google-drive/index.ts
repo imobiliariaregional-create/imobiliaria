@@ -42,6 +42,7 @@ const categoryFolders: Record<string, string[]> = {
   autorizacao: ["01 - AUTORIZACOES DE ADMINISTRACAO"],
   contrato_locacao: ["02 - CONTRATOS DE LOCACAO"],
   contrato_venda: ["03 - CONTRATOS DE VENDA"],
+  aditivo: ["07 - ADITIVOS CONTRATUAIS"],
   laudo: ["04 - LAUDOS DE VISTORIA"],
   nota_fiscal: ["05 - NOTAS FISCAIS"],
   papel_timbrado: ["06 - PAPEL TIMBRADO"],

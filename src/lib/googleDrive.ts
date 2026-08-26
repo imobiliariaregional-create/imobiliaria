@@ -13,7 +13,7 @@ async function request(body: BodyInit, contentType?: string) {
   return response;
 }
 
-export type DriveCategory = "autorizacao" | "contrato_locacao" | "contrato_venda" | "laudo" | "nota_fiscal" | "papel_timbrado";
+export type DriveCategory = "autorizacao" | "contrato_locacao" | "contrato_venda" | "aditivo" | "laudo" | "nota_fiscal" | "papel_timbrado";
 
 export interface DriveUploadOptions {
   category: DriveCategory;

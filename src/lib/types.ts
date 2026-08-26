@@ -136,6 +136,7 @@ export interface LaudoVistoria {
   id: string;
   contrato_id: string;
   tipo: TipoLaudo;
+  numero: string | null;
   data: string;
   arquivo_url: string | null;
   drive_file_id: string | null;
@@ -192,6 +193,22 @@ export interface ContratoGerado {
   drive_file_name: string | null;
   drive_mime_type: string | null;
   drive_file_size: number | null;
+}
+
+export type TipoAditivo = "prazo" | "valor" | "clausulas" | "outro";
+export interface AditivoContratual {
+  id: string;
+  contrato_id: string;
+  numero: string | null;
+  data: string;
+  tipo: TipoAditivo;
+  titulo: string | null;
+  descricao: string | null;
+  drive_file_id: string | null;
+  drive_file_name: string | null;
+  drive_mime_type: string | null;
+  drive_file_size: number | null;
+  created_at: string;
 }
 
 export interface ConfiguracaoDocumentos {

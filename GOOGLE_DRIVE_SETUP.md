@@ -1,6 +1,6 @@
 # Google Drive para os documentos do sistema
 
-Novos contratos, autorizações, laudos, notas fiscais e o papel timbrado não são salvos no Storage do Supabase. O banco guarda somente o ID, nome, tipo e tamanho; o conteúdo fica na pasta privada escolhida no Google Drive. Anexos antigos continuam disponíveis durante a transição.
+Novos contratos, autorizações, aditivos, laudos, notas fiscais e o papel timbrado não são salvos no Storage do Supabase. O banco guarda somente o ID, nome, tipo e tamanho; o conteúdo fica na pasta privada escolhida no Google Drive. Anexos antigos continuam disponíveis durante a transição.
 
 ## Organização automática
 
@@ -15,6 +15,7 @@ Dentro da pasta indicada por `GOOGLE_DRIVE_FOLDER_ID`, o sistema cria:
 04 - LAUDOS DE VISTORIA
 05 - NOTAS FISCAIS
 06 - PAPEL TIMBRADO
+07 - ADITIVOS CONTRATUAIS
 ```
 
 As subpastas de ano, mês, proprietário, imóvel e número do contrato são criadas quando o primeiro arquivo daquela classificação é enviado. A pasta-raiz pode ser renomeada ou movida no Google Drive sem alterar a configuração, pois o ID permanece o mesmo.

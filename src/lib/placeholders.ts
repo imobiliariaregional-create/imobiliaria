@@ -27,7 +27,9 @@ function enderecoCompletoImovel(imovel: Imovel): string {
 }
 
 function numeroContratoExtenso(numero: string): string {
-  const [seqStr, anoStr] = numero.split("/");
+  const correspondencia = numero.match(/^(?:[A-Z]+-)?(\d+)\/(\d{2,4})$/i);
+  if (!correspondencia) return "";
+  const [, seqStr, anoStr] = correspondencia;
   const seq = Number(seqStr);
   const ano = Number(anoStr);
   if (Number.isNaN(seq) || Number.isNaN(ano)) return "";
@@ -201,7 +203,7 @@ export const PLACEHOLDERS: PlaceholderInfo[] = [
   { codigo: "#tipo_imovel", descricao: "\"Residencial\" ou \"Comercial\"", categoria: "Imóvel" },
   { codigo: "#descricao_imovel", descricao: "Descrição/características cadastradas no imóvel", categoria: "Imóvel" },
 
-  { codigo: "#numero_contrato", descricao: "Número do contrato (ex: 001/26)", categoria: "Contrato" },
+  { codigo: "#numero_contrato", descricao: "Número do contrato (ex: CTR-0001/2026)", categoria: "Contrato" },
   { codigo: "#numero_contrato_extenso", descricao: "Número do contrato por extenso", categoria: "Contrato" },
   { codigo: "#data_inicio", descricao: "Data de início do contrato", categoria: "Contrato" },
   { codigo: "#data_inicio_extenso", descricao: "Data de início por extenso", categoria: "Contrato" },
