@@ -56,12 +56,14 @@ export function ClausulasEditor({
             value={clausula.titulo ?? ""}
             onChange={(e) => atualizar(clausula.id, { titulo: e.target.value || null })}
             placeholder="ex: Das Partes"
+            forceUppercase={false}
           />
           <Textarea
             rows={5}
             value={clausula.texto}
             onChange={(e) => atualizar(clausula.id, { texto: e.target.value })}
             placeholder="Texto da cláusula. Use códigos como #nome_locador para preencher automaticamente."
+            forceUppercase={false}
           />
         </div>
       ))}

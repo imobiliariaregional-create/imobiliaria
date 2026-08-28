@@ -40,9 +40,11 @@ export function Label({ className = "", ...props }: LabelHTMLAttributes<HTMLLabe
   return <label {...props} className={`mb-1.5 block text-sm font-semibold text-slate-700 ${className}`} />;
 }
 
-export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
-  const { onInput, ...inputProps } = props;
-  const uppercase = !["date", "datetime-local", "email", "file", "month", "number", "password", "time"].includes(props.type ?? "text");
+export function Input(props: InputHTMLAttributes<HTMLInputElement> & { forceUppercase?: boolean }) {
+  const { onInput, forceUppercase, ...inputProps } = props;
+  const uppercase =
+    (forceUppercase ?? true) &&
+    !["date", "datetime-local", "email", "file", "month", "number", "password", "time"].includes(props.type ?? "text");
   return (
     <input
       {...inputProps}
@@ -62,16 +64,19 @@ export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   );
 }
 
-export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  const { onInput, ...textareaProps } = props;
+export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement> & { forceUppercase?: boolean }) {
+  const { onInput, forceUppercase, ...textareaProps } = props;
+  const uppercase = forceUppercase ?? true;
   return (
     <textarea
       {...textareaProps}
-      autoCapitalize="characters"
+      autoCapitalize={uppercase ? "characters" : textareaProps.autoCapitalize}
       onInput={(event) => {
-        const { selectionStart, selectionEnd } = event.currentTarget;
-        event.currentTarget.value = event.currentTarget.value.toLocaleUpperCase("pt-BR");
-        event.currentTarget.setSelectionRange(selectionStart, selectionEnd);
+        if (uppercase) {
+          const { selectionStart, selectionEnd } = event.currentTarget;
+          event.currentTarget.value = event.currentTarget.value.toLocaleUpperCase("pt-BR");
+          event.currentTarget.setSelectionRange(selectionStart, selectionEnd);
+        }
         onInput?.(event);
       }}
       className={`w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-brand-600 focus:ring-4 focus:ring-brand-100 disabled:bg-slate-50 ${props.className ?? ""}`}
