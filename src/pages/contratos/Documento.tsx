@@ -11,6 +11,7 @@ import { downloadBlob, exportContratoDocx, gerarContratoPdfBase64, gerarContrato
 import { enviarParaAssinatura, consultarStatusAssinatura, obterDocumentoAssinado, STATUS_LABEL } from "@/lib/assinafy";
 import { deleteDriveFile, downloadDriveFile, uploadDriveFile, type DriveUploadOptions } from "@/lib/googleDrive";
 import type { ClausulaDocumento, Contrato, ContratoGerado, ModeloContrato } from "@/lib/types";
+import type { CabecalhoDocumento } from "@/lib/contratoDocumento";
 
 export function ContratoDocumentoPage() {
   const { id } = useParams<{ id: string }>();
@@ -126,7 +127,7 @@ export function ContratoDocumentoPage() {
     setError(null);
     try {
       const letterheadDataUrl = await fetchLetterheadDataUrl();
-      const blob = gerarContratoPdfBlob(clausulas, { letterheadDataUrl });
+      const blob = gerarContratoPdfBlob(clausulas, { letterheadDataUrl, cabecalho });
       const fileName = `CONTRATO${contrato?.numero_contrato ? " " + contrato.numero_contrato.replace("/", "-") : ""}.pdf`;
       await salvarArquivoNoDrive(blob, fileName);
       downloadBlob(blob, fileName);
@@ -142,7 +143,7 @@ export function ContratoDocumentoPage() {
     setError(null);
     try {
       const letterheadDataUrl = await fetchLetterheadDataUrl();
-      await exportContratoDocx(clausulas, { numeroContrato: contrato?.numero_contrato, letterheadDataUrl });
+      await exportContratoDocx(clausulas, { numeroContrato: contrato?.numero_contrato, letterheadDataUrl, cabecalho });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao exportar Word.");
     } finally {
@@ -162,7 +163,7 @@ export function ContratoDocumentoPage() {
       if (!pessoa.email) throw new Error("O inquilino/comprador não tem e-mail cadastrado.");
 
       const letterheadDataUrl = await fetchLetterheadDataUrl();
-      const pdfBase64 = gerarContratoPdfBase64(clausulas, { letterheadDataUrl });
+      const pdfBase64 = gerarContratoPdfBase64(clausulas, { letterheadDataUrl, cabecalho });
       const fileName = `contrato${contrato.numero_contrato ? "-" + contrato.numero_contrato.replace("/", "-") : ""}.pdf`;
 
       const resultado = await enviarParaAssinatura(pdfBase64, fileName, [
@@ -251,6 +252,15 @@ export function ContratoDocumentoPage() {
 
   if (contrato === undefined || gerado === undefined) return <LoadingState />;
   if (contrato === null) return <p className="text-sm text-slate-500">Contrato não encontrado.</p>;
+
+  const cabecalho: CabecalhoDocumento | undefined = gerado
+    ? {
+        numeroContrato: contrato.numero_contrato,
+        data: gerado.created_at,
+        tipoImovel: contrato.imoveis?.tipo_imovel ?? null,
+        tipoOperacao: contrato.tipo,
+      }
+    : undefined;
 
   return (
     <div className="space-y-6">
@@ -348,7 +358,7 @@ export function ContratoDocumentoPage() {
           <div>
             <p className="text-sm font-medium text-slate-700 mb-2 print:hidden">Pré-visualização</p>
             <Card className="print:shadow-none print:border-none">
-              <DocumentoContratoView clausulas={clausulas} />
+              <DocumentoContratoView clausulas={clausulas} cabecalho={cabecalho} />
             </Card>
           </div>
         </>

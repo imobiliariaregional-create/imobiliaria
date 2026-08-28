@@ -46,6 +46,22 @@ textarea {
   }
 }
 
+.clause-rich-content table {
+  border-collapse: collapse;
+}
+
+.clause-rich-content td,
+.clause-rich-content th {
+  border: 1px solid #94a3b8;
+  padding: 6px 8px;
+}
+
+.clause-rich-content[data-placeholder]:empty::before,
+.clause-rich-content[data-placeholder] > p:only-child:empty::before {
+  content: attr(data-placeholder);
+  color: #94a3b8;
+}
+
 @media print {
   body * {
     visibility: hidden;

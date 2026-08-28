@@ -1,4 +1,5 @@
-import { Button, Input, Label, Textarea } from "@/components/ui";
+import { Button, Input, Label } from "@/components/ui";
+import { RichTextEditor } from "@/components/RichTextEditor";
 import type { ClausulaDocumento } from "@/lib/types";
 
 function novoId() {
@@ -58,12 +59,10 @@ export function ClausulasEditor({
             placeholder="ex: Das Partes"
             forceUppercase={false}
           />
-          <Textarea
-            rows={5}
+          <RichTextEditor
             value={clausula.texto}
-            onChange={(e) => atualizar(clausula.id, { texto: e.target.value })}
+            onChange={(texto) => atualizar(clausula.id, { texto })}
             placeholder="Texto da cláusula. Use códigos como #nome_locador para preencher automaticamente."
-            forceUppercase={false}
           />
         </div>
       ))}
