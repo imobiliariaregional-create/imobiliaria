@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
-import { PageHeader, Card, Field, Select, Button, Badge, LoadingState, ErrorState } from "@/components/ui";
+import { PageHeader, Card, Field, Select, Input, Button, Badge, LoadingState, ErrorState } from "@/components/ui";
+import { Modal } from "@/components/Modal";
 import { ClausulasEditor } from "@/components/ClausulasEditor";
 import { DocumentoContratoView } from "@/components/DocumentoContratoView";
 import { resolverPlaceholders, substituirPlaceholders } from "@/lib/placeholders";
@@ -26,6 +27,10 @@ export function ContratoDocumentoPage() {
   const [error, setError] = useState<string | null>(null);
   const [exportando, setExportando] = useState<"pdf" | "docx" | null>(null);
   const [assinaturaPending, setAssinaturaPending] = useState(false);
+  const [modalAssinatura, setModalAssinatura] = useState(false);
+  const [emailProprietario, setEmailProprietario] = useState("");
+  const [emailPessoa, setEmailPessoa] = useState("");
+  const [erroModalAssinatura, setErroModalAssinatura] = useState<string | null>(null);
 
   async function reload() {
     setError(null);
@@ -151,6 +156,28 @@ export function ContratoDocumentoPage() {
     }
   }
 
+  function abrirModalAssinatura() {
+    if (!contrato) return;
+    setEmailProprietario(contrato.imoveis?.proprietarios?.email ?? "");
+    setEmailPessoa(contrato.pessoas?.email ?? "");
+    setErroModalAssinatura(null);
+    setModalAssinatura(true);
+  }
+
+  function confirmarEnviarAssinatura() {
+    const emailValido = (valor: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor.trim());
+    if (!emailValido(emailProprietario)) {
+      setErroModalAssinatura("Informe um e-mail válido para o proprietário.");
+      return;
+    }
+    if (!emailValido(emailPessoa)) {
+      setErroModalAssinatura("Informe um e-mail válido para o inquilino/comprador.");
+      return;
+    }
+    setModalAssinatura(false);
+    enviarAssinatura();
+  }
+
   async function enviarAssinatura() {
     if (!gerado || !contrato) return;
     setAssinaturaPending(true);
@@ -158,17 +185,16 @@ export function ContratoDocumentoPage() {
     try {
       const proprietario = contrato.imoveis?.proprietarios;
       const pessoa = contrato.pessoas;
-      if (!proprietario?.email) throw new Error("O proprietário não tem e-mail cadastrado.");
+      if (!proprietario) throw new Error("O imóvel deste contrato não tem proprietário cadastrado.");
       if (!pessoa) throw new Error("Este contrato não tem inquilino/comprador vinculado.");
-      if (!pessoa.email) throw new Error("O inquilino/comprador não tem e-mail cadastrado.");
 
       const letterheadDataUrl = await fetchLetterheadDataUrl();
       const pdfBase64 = gerarContratoPdfBase64(clausulas, { letterheadDataUrl, cabecalho });
       const fileName = `contrato${contrato.numero_contrato ? "-" + contrato.numero_contrato.replace("/", "-") : ""}.pdf`;
 
       const resultado = await enviarParaAssinatura(pdfBase64, fileName, [
-        { nome: proprietario.nome, email: proprietario.email },
-        { nome: pessoa.nome, email: pessoa.email },
+        { nome: proprietario.nome, email: emailProprietario.trim() },
+        { nome: pessoa.nome, email: emailPessoa.trim() },
       ]);
 
       const { data, error } = await supabase
@@ -320,7 +346,7 @@ export function ContratoDocumentoPage() {
                 <p className="text-sm text-slate-500">
                   Envia este PDF para o proprietário e o inquilino/comprador assinarem digitalmente (via Assinafy).
                 </p>
-                <Button type="button" onClick={enviarAssinatura} disabled={assinaturaPending}>
+                <Button type="button" onClick={abrirModalAssinatura} disabled={assinaturaPending}>
                   {assinaturaPending ? "Enviando..." : "Enviar para assinatura"}
                 </Button>
               </div>
@@ -349,6 +375,41 @@ export function ContratoDocumentoPage() {
               </div>
             )}
           </Card>
+
+          <Modal open={modalAssinatura} title="Enviar para assinatura" onClose={() => setModalAssinatura(false)}>
+            <div className="space-y-4">
+              <p className="text-sm text-slate-500">
+                Confira os e-mails que vão receber o documento para assinatura. Você pode alterá-los antes de enviar.
+              </p>
+              <Field label={`Proprietário — ${contrato.imoveis?.proprietarios?.nome ?? ""}`} htmlFor="email_proprietario_assinatura">
+                <Input
+                  id="email_proprietario_assinatura"
+                  type="email"
+                  value={emailProprietario}
+                  onChange={(e) => setEmailProprietario(e.target.value)}
+                  placeholder="email@exemplo.com"
+                />
+              </Field>
+              <Field label={`Inquilino/Comprador — ${contrato.pessoas?.nome ?? ""}`} htmlFor="email_pessoa_assinatura">
+                <Input
+                  id="email_pessoa_assinatura"
+                  type="email"
+                  value={emailPessoa}
+                  onChange={(e) => setEmailPessoa(e.target.value)}
+                  placeholder="email@exemplo.com"
+                />
+              </Field>
+              {erroModalAssinatura && <ErrorState message={erroModalAssinatura} />}
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="secondary" onClick={() => setModalAssinatura(false)}>
+                  Cancelar
+                </Button>
+                <Button type="button" onClick={confirmarEnviarAssinatura}>
+                  Confirmar e enviar
+                </Button>
+              </div>
+            </div>
+          </Modal>
 
           <div className="print:hidden">
             <p className="text-sm font-medium text-slate-700 mb-2">Editar cláusulas</p>
