@@ -6,10 +6,11 @@ import type { AutorizacaoAdministracao, Imovel, Proprietario, StatusAutorizacao 
 import { normalizeSearch, upperOrNull } from "@/lib/forms";
 import { enderecoImovel } from "@/lib/imovelLabel";
 import { formatDate, todayISO } from "@/lib/format";
-import { deleteDriveFile, downloadDriveFile, uploadDriveFile } from "@/lib/googleDrive";
+import { deleteDriveFile, downloadDriveFile, getDriveFileBlob, uploadDriveFile } from "@/lib/googleDrive";
+import { enviarParaAssinatura, consultarStatusAssinatura, baixarDocumentoAssinado, blobParaBase64, STATUS_LABEL } from "@/lib/assinafy";
 import { confirmDeletion } from "@/lib/actions";
 import { useAuth } from "@/lib/auth";
-import { Download, FileUp, Pencil, Plus, Trash2 } from "lucide-react";
+import { Download, FileUp, PenLine, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 
 const statusLabels: Record<StatusAutorizacao, string> = { ativa: "Ativa", encerrada: "Encerrada", cancelada: "Cancelada" };
 
@@ -23,6 +24,10 @@ export function AutorizacoesListPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [pendingDownload, setPendingDownload] = useState<string | null>(null);
+  const [modalAssinatura, setModalAssinatura] = useState<AutorizacaoAdministracao | null>(null);
+  const [emailAssinatura, setEmailAssinatura] = useState("");
+  const [erroAssinatura, setErroAssinatura] = useState<string | null>(null);
+  const [assinaturaPendingId, setAssinaturaPendingId] = useState<string | null>(null);
 
   async function reload() {
     const [{ data: rows }, { data: owners }, { data: properties }] = await Promise.all([
@@ -57,6 +62,74 @@ export function AutorizacoesListPage() {
     finally { setPendingDownload(null); }
   }
 
+  function abrirModalAssinatura(item: AutorizacaoAdministracao) {
+    setModalAssinatura(item);
+    setEmailAssinatura(item.proprietarios?.email ?? "");
+    setErroAssinatura(null);
+  }
+
+  async function confirmarEnviarAssinatura() {
+    const item = modalAssinatura;
+    if (!item) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailAssinatura.trim())) {
+      setErroAssinatura("Informe um e-mail válido.");
+      return;
+    }
+    if (!item.drive_file_id) {
+      setErroAssinatura("Este item não tem arquivo anexado.");
+      return;
+    }
+    setModalAssinatura(null);
+    setAssinaturaPendingId(item.id);
+    try {
+      const blob = await getDriveFileBlob(item.drive_file_id, item.drive_mime_type);
+      const pdfBase64 = await blobParaBase64(blob);
+      const resultado = await enviarParaAssinatura(pdfBase64, item.drive_file_name ?? "autorizacao.pdf", [
+        { nome: item.proprietarios?.nome ?? "Proprietário", email: emailAssinatura.trim() },
+      ]);
+      const { error } = await supabase.from("autorizacoes_administracao").update({
+        assinafy_document_id: resultado.documentId,
+        assinafy_assignment_id: resultado.assignmentId,
+        assinafy_status: resultado.status,
+      }).eq("id", item.id);
+      if (error) throw error;
+      await reload();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Erro ao enviar para assinatura.");
+    } finally {
+      setAssinaturaPendingId(null);
+    }
+  }
+
+  async function atualizarStatusAssinatura(item: AutorizacaoAdministracao) {
+    if (!item.assinafy_document_id) return;
+    setAssinaturaPendingId(item.id);
+    try {
+      const status = await consultarStatusAssinatura(item.assinafy_document_id);
+      const { error } = await supabase.from("autorizacoes_administracao")
+        .update({ assinafy_status: status.status, assinafy_resumo: status.resumo })
+        .eq("id", item.id);
+      if (error) throw error;
+      await reload();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Erro ao consultar status.");
+    } finally {
+      setAssinaturaPendingId(null);
+    }
+  }
+
+  async function baixarAssinado(item: AutorizacaoAdministracao) {
+    if (!item.assinafy_document_id) return;
+    setAssinaturaPendingId(item.id);
+    try {
+      await baixarDocumentoAssinado(item.assinafy_document_id, "certificated", `${item.numero ?? "autorizacao"}-assinado.pdf`);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Erro ao baixar documento assinado.");
+    } finally {
+      setAssinaturaPendingId(null);
+    }
+  }
+
   return <div>
     <div className="mb-7 flex items-end justify-between gap-4">
       <PageHeader title="Autorizações de administração" />
@@ -64,18 +137,48 @@ export function AutorizacoesListPage() {
     </div>
     <TableToolbar search={search} onSearch={setSearch} total={data?.length ?? 0} shown={filtered.length} filter={status} onFilter={setStatus} filterLabel="Status" options={Object.entries(statusLabels).map(([value, label]) => ({ value, label }))} />
     <Card>{data === null ? <LoadingState /> : filtered.length === 0 ? <EmptyState message="Nenhuma autorização encontrada." /> : <Table>
-      <thead><tr><Th>Número</Th><Th>Proprietário</Th><Th>Imóveis</Th><Th>Vigência</Th><Th>Status</Th><Th>Anexo</Th><Th>Ações</Th></tr></thead>
+      <thead><tr><Th>Número</Th><Th>Proprietário</Th><Th>Imóveis</Th><Th>Vigência</Th><Th>Status</Th><Th>Anexo</Th><Th>Assinatura</Th><Th>Ações</Th></tr></thead>
       <tbody>{filtered.map((item) => <tr key={item.id}>
         <Td>{item.numero || "SEM NÚMERO"}</Td><Td className="font-medium">{item.proprietarios?.nome ?? "-"}</Td>
         <Td>{item.autorizacao_imoveis?.map((link) => link.imoveis ? enderecoImovel(link.imoveis) : "").filter(Boolean).join("; ") || "-"}</Td>
         <Td>{formatDate(item.data_inicio)}{item.data_fim ? ` a ${formatDate(item.data_fim)}` : ""}</Td>
         <Td><Badge color={item.status === "ativa" ? "green" : item.status === "cancelada" ? "red" : "slate"}>{statusLabels[item.status]}</Badge></Td>
         <Td>{item.drive_file_id ? <Button variant="secondary" disabled={pendingDownload === item.id} onClick={() => download(item)}><Download size={15} /> {pendingDownload === item.id ? "Baixando..." : "Baixar"}</Button> : "Sem anexo"}</Td>
+        <Td>
+          {!item.drive_file_id || item.drive_mime_type !== "application/pdf" ? (
+            <span className="text-slate-400">—</span>
+          ) : !item.assinafy_document_id ? (
+            canWrite && <Button variant="secondary" disabled={assinaturaPendingId === item.id} onClick={() => abrirModalAssinatura(item)} title="Enviar para assinatura"><PenLine size={15} /></Button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Badge color={item.assinafy_status === "certificated" ? "green" : "yellow"}>{STATUS_LABEL[item.assinafy_status ?? ""] ?? item.assinafy_status}</Badge>
+              <Button variant="secondary" disabled={assinaturaPendingId === item.id} onClick={() => atualizarStatusAssinatura(item)} title="Atualizar status"><RefreshCw size={15} /></Button>
+              {item.assinafy_status === "certificated" && (
+                <Button variant="secondary" disabled={assinaturaPendingId === item.id} onClick={() => baixarAssinado(item)} title="Baixar assinado"><Download size={15} /></Button>
+              )}
+            </div>
+          )}
+        </Td>
         <Td><div className="flex gap-2">{canWrite && <Button variant="secondary" onClick={() => setEditing(item)}><Pencil size={15} /></Button>}{papel === "admin" && <Button variant="danger" onClick={() => remove(item)}><Trash2 size={15} /></Button>}</div></Td>
       </tr>)}</tbody>
     </Table>}</Card>
     <Modal open={editing !== undefined} title={editing ? "Editar autorização" : "Nova autorização"} onClose={() => setEditing(undefined)}>
       <AuthorizationForm value={editing ?? undefined} owners={owners} properties={properties} onSaved={async () => { setEditing(undefined); await reload(); }} />
+    </Modal>
+    <Modal open={modalAssinatura !== null} title="Enviar para assinatura" onClose={() => setModalAssinatura(null)}>
+      <div className="space-y-4">
+        <p className="text-sm text-slate-500">
+          Confira o e-mail do proprietário que vai receber a autorização para assinatura. Você pode alterá-lo antes de enviar.
+        </p>
+        <Field label={`Proprietário — ${modalAssinatura?.proprietarios?.nome ?? ""}`} htmlFor="email_assinatura_autorizacao">
+          <Input id="email_assinatura_autorizacao" type="email" value={emailAssinatura} onChange={(e) => setEmailAssinatura(e.target.value)} placeholder="email@exemplo.com" />
+        </Field>
+        {erroAssinatura && <ErrorState message={erroAssinatura} />}
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={() => setModalAssinatura(null)}>Cancelar</Button>
+          <Button type="button" onClick={confirmarEnviarAssinatura}>Confirmar e enviar</Button>
+        </div>
+      </div>
     </Modal>
   </div>;
 }

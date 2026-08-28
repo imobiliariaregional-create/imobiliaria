@@ -179,12 +179,19 @@ export interface ModeloContrato {
   created_at: string;
 }
 
+export type OrigemContratoGerado = "gerado" | "importado";
+
 export interface ContratoGerado {
   id: string;
   contrato_id: string;
   modelo_id: string | null;
   clausulas: ClausulaDocumento[];
   created_at: string;
+  origem: OrigemContratoGerado;
+  arquivo_importado_drive_file_id: string | null;
+  arquivo_importado_drive_file_name: string | null;
+  arquivo_importado_drive_mime_type: string | null;
+  arquivo_importado_drive_file_size: number | null;
   assinafy_document_id: string | null;
   assinafy_assignment_id: string | null;
   assinafy_status: string | null;
@@ -232,6 +239,10 @@ export interface AutorizacaoAdministracao {
   drive_file_name: string | null;
   drive_mime_type: string | null;
   drive_file_size: number | null;
+  assinafy_document_id: string | null;
+  assinafy_assignment_id: string | null;
+  assinafy_status: string | null;
+  assinafy_resumo: { signer_count: number; completed_count: number } | null;
   created_at: string;
   updated_at: string;
   proprietarios?: Proprietario | null;

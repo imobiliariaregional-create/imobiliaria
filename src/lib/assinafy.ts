@@ -32,6 +32,16 @@ async function invocar<T>(body: Record<string, unknown>): Promise<T> {
   return data as T;
 }
 
+/** Converte um Blob (ex: PDF baixado do Drive) em base64, para enviar ao Assinafy. */
+export function blobParaBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve((reader.result as string).split(",")[1] ?? "");
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
 export function enviarParaAssinatura(
   pdfBase64: string,
   fileName: string,

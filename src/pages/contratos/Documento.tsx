@@ -9,8 +9,8 @@ import { resolverPlaceholders, substituirPlaceholders } from "@/lib/placeholders
 import { enderecoImovel, imovelLabel } from "@/lib/imovelLabel";
 import { fetchLetterheadDataUrl } from "@/lib/letterhead";
 import { downloadBlob, exportContratoDocx, gerarContratoPdfBase64, gerarContratoPdfBlob } from "@/lib/exportContrato";
-import { enviarParaAssinatura, consultarStatusAssinatura, obterDocumentoAssinado, STATUS_LABEL } from "@/lib/assinafy";
-import { deleteDriveFile, downloadDriveFile, uploadDriveFile, type DriveUploadOptions } from "@/lib/googleDrive";
+import { enviarParaAssinatura, consultarStatusAssinatura, obterDocumentoAssinado, blobParaBase64, STATUS_LABEL } from "@/lib/assinafy";
+import { deleteDriveFile, downloadDriveFile, getDriveFileBlob, uploadDriveFile, type DriveUploadOptions } from "@/lib/googleDrive";
 import type { ClausulaDocumento, Contrato, ContratoGerado, ModeloContrato } from "@/lib/types";
 import type { CabecalhoDocumento } from "@/lib/contratoDocumento";
 
@@ -27,6 +27,7 @@ export function ContratoDocumentoPage() {
   const [error, setError] = useState<string | null>(null);
   const [exportando, setExportando] = useState<"pdf" | "docx" | null>(null);
   const [assinaturaPending, setAssinaturaPending] = useState(false);
+  const [importPending, setImportPending] = useState(false);
   const [modalAssinatura, setModalAssinatura] = useState(false);
   const [emailProprietario, setEmailProprietario] = useState("");
   const [emailPessoa, setEmailPessoa] = useState("");
@@ -104,6 +105,35 @@ export function ContratoDocumentoPage() {
       setError(err instanceof Error ? err.message : "Erro ao gerar documento.");
     } finally {
       setPending(false);
+    }
+  }
+
+  async function importarArquivo(file: File) {
+    setError(null);
+    setImportPending(true);
+    let uploaded: Awaited<ReturnType<typeof uploadDriveFile>> | null = null;
+    try {
+      if (file.type !== "application/pdf") throw new Error("Envie um arquivo PDF.");
+      uploaded = await uploadDriveFile(file, { ...driveOptions(), fileName: file.name });
+      const dadosArquivo = {
+        arquivo_importado_drive_file_id: uploaded.id,
+        arquivo_importado_drive_file_name: uploaded.name,
+        arquivo_importado_drive_mime_type: uploaded.mimeType,
+        arquivo_importado_drive_file_size: Number(uploaded.size),
+      };
+      const query = gerado
+        ? supabase.from("contratos_gerados").update(dadosArquivo).eq("id", gerado.id)
+        : supabase.from("contratos_gerados").insert({ contrato_id: id, modelo_id: null, clausulas: [], origem: "importado", ...dadosArquivo });
+      const { data, error } = await query.select("*").single<ContratoGerado>();
+      if (error) throw new Error(error.message);
+      const previousId = gerado?.arquivo_importado_drive_file_id;
+      setGerado(data);
+      if (previousId && previousId !== uploaded.id) await deleteDriveFile(previousId, driveOptions().category);
+    } catch (err) {
+      if (uploaded) await deleteDriveFile(uploaded.id, driveOptions().category).catch(() => undefined);
+      setError(err instanceof Error ? err.message : "Erro ao importar arquivo.");
+    } finally {
+      setImportPending(false);
     }
   }
 
@@ -187,8 +217,15 @@ export function ContratoDocumentoPage() {
       if (!proprietario) throw new Error("O imóvel deste contrato não tem proprietário cadastrado.");
       if (!pessoa) throw new Error("Este contrato não tem inquilino/comprador vinculado.");
 
-      const letterheadDataUrl = await fetchLetterheadDataUrl();
-      const pdfBase64 = gerarContratoPdfBase64(clausulas, { letterheadDataUrl, cabecalho });
+      let pdfBase64: string;
+      if (gerado.origem === "importado") {
+        if (!gerado.arquivo_importado_drive_file_id) throw new Error("Nenhum arquivo importado encontrado.");
+        const blob = await getDriveFileBlob(gerado.arquivo_importado_drive_file_id, gerado.arquivo_importado_drive_mime_type);
+        pdfBase64 = await blobParaBase64(blob);
+      } else {
+        const letterheadDataUrl = await fetchLetterheadDataUrl();
+        pdfBase64 = gerarContratoPdfBase64(clausulas, { letterheadDataUrl, cabecalho });
+      }
       const fileName = `contrato${contrato.numero_contrato ? "-" + contrato.numero_contrato.replace("/", "-") : ""}.pdf`;
 
       const resultado = await enviarParaAssinatura(pdfBase64, fileName, [
@@ -292,48 +329,106 @@ export function ContratoDocumentoPage() {
       <PageHeader title={`Documento do contrato — ${imovelLabel(contrato.imoveis!, contrato)}`} />
 
       {!gerado ? (
-        <Card className="p-6 max-w-xl">
-          {modelos.length === 0 ? (
-            <p className="text-sm text-slate-500">
-              Nenhum modelo de contrato cadastrado para o tipo "{contrato.tipo}". Cadastre um em Modelos de Contrato.
+        <div className="grid gap-6 max-w-xl">
+          <Card className="p-6">
+            {modelos.length === 0 ? (
+              <p className="text-sm text-slate-500">
+                Nenhum modelo de contrato cadastrado para o tipo "{contrato.tipo}". Cadastre um em Modelos de Contrato.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                <Field label="Modelo de contrato" htmlFor="modelo_id">
+                  <Select id="modelo_id" value={modeloId} onChange={(e) => setModeloId(e.target.value)}>
+                    {modelos.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.nome}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Button type="button" onClick={gerarDocumento} disabled={pending}>
+                  {pending ? "Gerando..." : "Gerar documento"}
+                </Button>
+              </div>
+            )}
+          </Card>
+
+          <Card className="p-6">
+            <h2 className="font-medium text-slate-900 mb-1">Ou importe um contrato já pronto</h2>
+            <p className="text-sm text-slate-500 mb-3">
+              Se o contrato já foi feito fora do sistema, envie o PDF pronto aqui para poder mandar direto para assinatura.
             </p>
-          ) : (
-            <div className="space-y-4">
-              <Field label="Modelo de contrato" htmlFor="modelo_id">
-                <Select id="modelo_id" value={modeloId} onChange={(e) => setModeloId(e.target.value)}>
-                  {modelos.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.nome}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              {error && <ErrorState message={error} />}
-              <Button type="button" onClick={gerarDocumento} disabled={pending}>
-                {pending ? "Gerando..." : "Gerar documento"}
-              </Button>
-            </div>
-          )}
-        </Card>
+            <label className="inline-block">
+              <span className="cursor-pointer rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+                {importPending ? "Importando..." : "Selecionar PDF"}
+              </span>
+              <input
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                disabled={importPending}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (file) importarArquivo(file);
+                }}
+              />
+            </label>
+          </Card>
+
+          {error && <ErrorState message={error} />}
+        </div>
       ) : (
         <>
-          <div className="flex gap-3 print:hidden">
-            <Button type="button" onClick={salvarAlteracoes} disabled={pending}>
-              {pending ? "Salvando..." : "Salvar alterações"}
-            </Button>
-            <Button type="button" variant="secondary" onClick={() => window.print()}>
-              Imprimir
-            </Button>
-            <Button type="button" variant="secondary" onClick={exportarPDF} disabled={exportando !== null}>
-              {exportando === "pdf" ? "Exportando..." : "Exportar PDF"}
-            </Button>
-            <Button type="button" variant="secondary" onClick={exportarWord} disabled={exportando !== null}>
-              {exportando === "docx" ? "Exportando..." : "Exportar Word"}
-            </Button>
-            {gerado.drive_file_id && gerado.drive_file_name && (
-              <Button type="button" variant="secondary" onClick={() => downloadDriveFile(gerado.drive_file_id!, gerado.drive_file_name!, gerado.drive_mime_type)}>
-                Baixar arquivo salvo no Drive
-              </Button>
+          <div className="flex flex-wrap gap-3 print:hidden">
+            {gerado.origem === "importado" ? (
+              <>
+                {gerado.arquivo_importado_drive_file_id && gerado.arquivo_importado_drive_file_name && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => downloadDriveFile(gerado.arquivo_importado_drive_file_id!, gerado.arquivo_importado_drive_file_name!, gerado.arquivo_importado_drive_mime_type)}
+                  >
+                    Baixar arquivo importado
+                  </Button>
+                )}
+                <label className="inline-block">
+                  <span className="cursor-pointer rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+                    {importPending ? "Importando..." : "Substituir arquivo importado"}
+                  </span>
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    className="hidden"
+                    disabled={importPending}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (file) importarArquivo(file);
+                    }}
+                  />
+                </label>
+              </>
+            ) : (
+              <>
+                <Button type="button" onClick={salvarAlteracoes} disabled={pending}>
+                  {pending ? "Salvando..." : "Salvar alterações"}
+                </Button>
+                <Button type="button" variant="secondary" onClick={() => window.print()}>
+                  Imprimir
+                </Button>
+                <Button type="button" variant="secondary" onClick={exportarPDF} disabled={exportando !== null}>
+                  {exportando === "pdf" ? "Exportando..." : "Exportar PDF"}
+                </Button>
+                <Button type="button" variant="secondary" onClick={exportarWord} disabled={exportando !== null}>
+                  {exportando === "docx" ? "Exportando..." : "Exportar Word"}
+                </Button>
+                {gerado.drive_file_id && gerado.drive_file_name && (
+                  <Button type="button" variant="secondary" onClick={() => downloadDriveFile(gerado.drive_file_id!, gerado.drive_file_name!, gerado.drive_mime_type)}>
+                    Baixar arquivo salvo no Drive
+                  </Button>
+                )}
+              </>
             )}
           </div>
           {error && <ErrorState message={error} />}
@@ -410,17 +505,21 @@ export function ContratoDocumentoPage() {
             </div>
           </Modal>
 
-          <div className="print:hidden">
-            <p className="text-sm font-medium text-slate-700 mb-2">Editar cláusulas</p>
-            <ClausulasEditor clausulas={clausulas} onChange={handleClausulasChange} />
-          </div>
+          {gerado.origem !== "importado" && (
+            <>
+              <div className="print:hidden">
+                <p className="text-sm font-medium text-slate-700 mb-2">Editar cláusulas</p>
+                <ClausulasEditor clausulas={clausulas} onChange={handleClausulasChange} />
+              </div>
 
-          <div>
-            <p className="text-sm font-medium text-slate-700 mb-2 print:hidden">Pré-visualização</p>
-            <Card className="print:shadow-none print:border-none">
-              <DocumentoContratoView clausulas={clausulas} cabecalho={cabecalho} />
-            </Card>
-          </div>
+              <div>
+                <p className="text-sm font-medium text-slate-700 mb-2 print:hidden">Pré-visualização</p>
+                <Card className="print:shadow-none print:border-none">
+                  <DocumentoContratoView clausulas={clausulas} cabecalho={cabecalho} />
+                </Card>
+              </div>
+            </>
+          )}
         </>
       )}
     </div>
