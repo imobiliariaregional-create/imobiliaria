@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Bold, Italic, AlignLeft, AlignCenter, AlignRight, AlignJustify, Table2 } from "lucide-react";
+import { Bold, Italic, AlignLeft, AlignCenter, AlignRight, AlignJustify, Table2, Trash2 } from "lucide-react";
 import { sanitizeClauseHtml, ensureClauseHtml } from "@/lib/richText";
 
 function ToolbarButton({
@@ -97,6 +97,21 @@ export function RichTextEditor({
     setTabelaAberta(false);
   }
 
+  function removerTabela() {
+    const editor = editorRef.current;
+    const sel = window.getSelection();
+    if (!editor || !sel || sel.rangeCount === 0) return;
+    let node: Node | null = sel.getRangeAt(0).startContainer;
+    while (node && node !== editor) {
+      if (node instanceof HTMLTableElement) {
+        node.remove();
+        emitChange();
+        return;
+      }
+      node = node.parentNode;
+    }
+  }
+
   return (
     <div className="relative rounded-xl border border-slate-300 bg-white">
       <div className="flex items-center gap-0.5 border-b border-slate-200 p-1">
@@ -122,6 +137,9 @@ export function RichTextEditor({
         <div className="mx-1 h-5 w-px bg-slate-200" />
         <ToolbarButton title="Inserir tabela" onMouseDown={abrirTabela}>
           <Table2 size={15} />
+        </ToolbarButton>
+        <ToolbarButton title="Remover tabela (clique dentro dela antes)" onMouseDown={removerTabela}>
+          <Trash2 size={15} />
         </ToolbarButton>
       </div>
 
