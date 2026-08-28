@@ -21,8 +21,28 @@ import {
   TextWrappingSide,
 } from "docx";
 import type { ClausulaDocumento } from "@/lib/types";
-import { parseClauseHtml, runsToPlainText, type Align, type ContentBlock, type ParagraphBlock, type TableBlock, type TextRun } from "@/lib/richText";
+import { parseClauseHtml, runsToPlainText, type Align, type ContentBlock, type ParagraphBlock, type TableBlock, type TableCell as ClauseTableCell, type TextRun } from "@/lib/richText";
 import { linhasCabecalho, tituloDocumento, type CabecalhoDocumento } from "@/lib/contratoDocumento";
+
+const COR_TEXTO_PADRAO: [number, number, number] = [23, 32, 28];
+
+function hexParaRgb(hex: string): [number, number, number] {
+  const n = parseInt(hex, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/** Escolhe texto branco ou escuro conforme o brilho do fundo, para manter legibilidade. */
+function corContrastante(hexFundo: string): [number, number, number] {
+  const [r, g, b] = hexParaRgb(hexFundo);
+  const luminancia = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminancia < 0.55 ? [255, 255, 255] : COR_TEXTO_PADRAO;
+}
+
+/** Se todas as runs com texto da célula compartilham a mesma cor explícita, retorna ela. */
+function corComumDaCelula(celula: ClauseTableCell): string | undefined {
+  const cores = new Set(celula.runs.filter((r) => r.text.trim() !== "").map((r) => r.color).filter((c): c is string => !!c));
+  return cores.size === 1 ? [...cores][0] : undefined;
+}
 
 const PAGE_W_PX = 794; // A4 a 96dpi
 const PAGE_H_PX = 1123;
@@ -47,6 +67,7 @@ interface Word {
   text: string;
   bold: boolean;
   italic: boolean;
+  color?: string;
   brk?: boolean;
 }
 
@@ -65,7 +86,7 @@ function tokenizeRuns(runs: TextRun[]): Word[] {
       continue;
     }
     for (const parte of run.text.split(" ").filter((p) => p.length > 0)) {
-      palavras.push({ text: parte, bold: !!run.bold, italic: !!run.italic });
+      palavras.push({ text: parte, bold: !!run.bold, italic: !!run.italic, color: run.color });
     }
   }
   return palavras;
@@ -118,9 +139,11 @@ function desenharLinhaComEstilo(doc: jsPDF, linha: Word[], x: number, y: number,
 
   linha.forEach((palavra, idx) => {
     doc.setFont("helvetica", fontFor(palavra.bold, palavra.italic));
+    doc.setTextColor(...(palavra.color ? hexParaRgb(palavra.color) : COR_TEXTO_PADRAO));
     doc.text(palavra.text, cursorX, y);
     cursorX += larguras[idx] + gap;
   });
+  doc.setTextColor(...COR_TEXTO_PADRAO);
 }
 
 function criarDocumentoPDF(
@@ -134,40 +157,43 @@ function criarDocumentoPDF(
   const fontSize = 10; // pt
   const lineHeight = fontSize * 0.3528 * 1.5; // espaçamento 1,5
 
-  function drawLetterhead() {
+  /** Desenha o papel timbrado e o cabecalho (numero/data/tipo + titulo) — repetido em toda pagina, como um cabecalho de verdade. */
+  function drawPageChrome(): number {
     if (opts.letterheadDataUrl) {
       doc.addImage(opts.letterheadDataUrl, "PNG", 0, 0, pageWidth, pageHeight);
     }
+    let topoConteudo = MARGIN_TOP_MM;
+    if (opts.cabecalho) {
+      let yCabecalho = MARGIN_TOP_MM;
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      for (const linha of linhasCabecalho(opts.cabecalho)) {
+        doc.text(linha, pageWidth - MARGIN_RIGHT_MM, yCabecalho, { align: "right" });
+        yCabecalho += lineHeight * 0.85;
+      }
+      yCabecalho += lineHeight * 0.5;
+      doc.setFontSize(13);
+      doc.setFont("helvetica", "bold");
+      doc.text(tituloDocumento(opts.cabecalho.tipoOperacao), pageWidth / 2, yCabecalho, { align: "center" });
+      yCabecalho += lineHeight * 1.6;
+      doc.setFontSize(fontSize);
+      doc.setFont("helvetica", "normal");
+      topoConteudo = yCabecalho;
+    }
+    return topoConteudo;
   }
 
-  let y = MARGIN_TOP_MM;
-  drawLetterhead();
+  let y = drawPageChrome();
+  const topoConteudoPadrao = y;
 
   function ensureSpace(neededHeight: number) {
     if (y + neededHeight > pageHeight - MARGIN_BOTTOM_MM) {
       doc.addPage();
-      drawLetterhead();
-      y = MARGIN_TOP_MM;
+      y = drawPageChrome();
     }
   }
 
   doc.setFontSize(fontSize);
-
-  if (opts.cabecalho) {
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    for (const linha of linhasCabecalho(opts.cabecalho)) {
-      doc.text(linha, pageWidth - MARGIN_RIGHT_MM, y, { align: "right" });
-      y += lineHeight * 0.85;
-    }
-    y += lineHeight * 0.5;
-    doc.setFontSize(13);
-    doc.setFont("helvetica", "bold");
-    doc.text(tituloDocumento(opts.cabecalho.tipoOperacao), pageWidth / 2, y, { align: "center" });
-    y += lineHeight * 1.6;
-    doc.setFontSize(fontSize);
-    doc.setFont("helvetica", "normal");
-  }
 
   function desenharParagrafo(block: ParagraphBlock) {
     const palavras = tokenizeRuns(block.runs);
@@ -188,11 +214,27 @@ function criarDocumentoPDF(
   function desenharTabela(block: TableBlock) {
     autoTable(doc, {
       startY: y,
-      margin: { left: MARGIN_LEFT_MM, right: MARGIN_RIGHT_MM, bottom: MARGIN_BOTTOM_MM },
-      body: block.rows.map((row) => row.map((celula) => runsToPlainText(celula))),
+      margin: { left: MARGIN_LEFT_MM, right: MARGIN_RIGHT_MM, bottom: MARGIN_BOTTOM_MM, top: topoConteudoPadrao },
+      body: block.rows.map((row) => row.map((celula) => runsToPlainText(celula.runs))),
       theme: "grid",
-      styles: { fontSize: 9, cellPadding: 2, lineColor: [148, 163, 184], lineWidth: 0.2, textColor: [23, 32, 28] },
-      willDrawPage: () => drawLetterhead(),
+      styles: { fontSize: 9, cellPadding: 2, lineColor: [148, 163, 184], lineWidth: 0.2, textColor: COR_TEXTO_PADRAO },
+      willDrawPage: () => {
+        drawPageChrome();
+      },
+      didParseCell: (data) => {
+        const celula = block.rows[data.row.index]?.[data.column.index];
+        if (!celula) return;
+        const corExplicita = corComumDaCelula(celula);
+        if (celula.background) {
+          data.cell.styles.fillColor = hexParaRgb(celula.background);
+          data.cell.styles.textColor = corExplicita ? hexParaRgb(corExplicita) : corContrastante(celula.background);
+        } else if (corExplicita) {
+          data.cell.styles.textColor = hexParaRgb(corExplicita);
+        }
+        if (celula.runs.length > 0 && celula.runs.every((r) => r.text.trim() === "" || r.bold)) {
+          data.cell.styles.fontStyle = "bold";
+        }
+      },
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     y = (doc as any).lastAutoTable.finalY + lineHeight * 0.6;
@@ -283,7 +325,7 @@ function runsToDocxRuns(runs: TextRun[]): DocxTextRun[] {
       out.push(new DocxTextRun({ text: "", break: 1 }));
       continue;
     }
-    out.push(new DocxTextRun({ text: run.text, bold: run.bold, italics: run.italic }));
+    out.push(new DocxTextRun({ text: run.text, bold: run.bold, italics: run.italic, color: run.color }));
   }
   return out;
 }
@@ -306,7 +348,8 @@ function tableFromBlock(block: TableBlock): Table {
           children: row.map(
             (celula) =>
               new TableCell({
-                children: [new Paragraph({ children: runsToDocxRuns(celula) })],
+                shading: celula.background ? { fill: celula.background } : undefined,
+                children: [new Paragraph({ children: runsToDocxRuns(celula.runs) })],
               })
           ),
         })
@@ -327,19 +370,6 @@ export async function gerarContratoDocxBlob(
 ) {
   const children: (Paragraph | Table)[] = [];
 
-  if (opts.cabecalho) {
-    for (const linha of linhasCabecalho(opts.cabecalho)) {
-      children.push(new Paragraph({ alignment: AlignmentType.RIGHT, children: [new DocxTextRun(linha)], spacing: { after: 40 } }));
-    }
-    children.push(
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        children: [new DocxTextRun({ text: tituloDocumento(opts.cabecalho.tipoOperacao), bold: true })],
-        spacing: { before: 150, after: 200 },
-      })
-    );
-  }
-
   for (const clausula of clausulas) {
     if (clausula.titulo) {
       children.push(
@@ -354,9 +384,23 @@ export async function gerarContratoDocxBlob(
     }
   }
 
-  const header = opts.letterheadDataUrl
-    ? new Header({ children: [new Paragraph({ children: [await letterheadImageRun(opts.letterheadDataUrl)] })] })
-    : undefined;
+  const headerChildren: Paragraph[] = [];
+  if (opts.letterheadDataUrl) {
+    headerChildren.push(new Paragraph({ children: [await letterheadImageRun(opts.letterheadDataUrl)] }));
+  }
+  if (opts.cabecalho) {
+    for (const linha of linhasCabecalho(opts.cabecalho)) {
+      headerChildren.push(new Paragraph({ alignment: AlignmentType.RIGHT, children: [new DocxTextRun(linha)], spacing: { after: 40 } }));
+    }
+    headerChildren.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [new DocxTextRun({ text: tituloDocumento(opts.cabecalho.tipoOperacao), bold: true })],
+        spacing: { before: 150, after: 200 },
+      })
+    );
+  }
+  const header = headerChildren.length > 0 ? new Header({ children: headerChildren }) : undefined;
 
   const doc = new Document({
     sections: [

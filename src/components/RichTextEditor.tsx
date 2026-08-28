@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Bold, Italic, AlignLeft, AlignCenter, AlignRight, AlignJustify, Table2, Trash2 } from "lucide-react";
+import { Bold, Italic, AlignLeft, AlignCenter, AlignRight, AlignJustify, Table2, Trash2, Baseline, PaintBucket, Eraser } from "lucide-react";
 import { sanitizeClauseHtml, ensureClauseHtml } from "@/lib/richText";
 
 function ToolbarButton({
@@ -44,6 +44,10 @@ export function RichTextEditor({
   const editorRef = useRef<HTMLDivElement>(null);
   const lastValueRef = useRef<string>("");
   const savedRangeRef = useRef<Range | null>(null);
+  const corRangeRef = useRef<Range | null>(null);
+  const corCelulaRef = useRef<HTMLTableCellElement | null>(null);
+  const corTextoInputRef = useRef<HTMLInputElement>(null);
+  const corFundoInputRef = useRef<HTMLInputElement>(null);
   const [tabelaAberta, setTabelaAberta] = useState(false);
   const [linhas, setLinhas] = useState(2);
   const [colunas, setColunas] = useState(2);
@@ -112,6 +116,54 @@ export function RichTextEditor({
     }
   }
 
+  function localizarCelula(): HTMLTableCellElement | null {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || !editorRef.current) return null;
+    let node: Node | null = sel.getRangeAt(0).startContainer;
+    while (node && node !== editorRef.current) {
+      if (node instanceof HTMLTableCellElement) return node;
+      node = node.parentNode;
+    }
+    return null;
+  }
+
+  function abrirCorTexto() {
+    const sel = window.getSelection();
+    corRangeRef.current = sel && sel.rangeCount > 0 && editorRef.current?.contains(sel.anchorNode) ? sel.getRangeAt(0).cloneRange() : null;
+    corTextoInputRef.current?.click();
+  }
+
+  function aplicarCorTexto(hex: string) {
+    const editor = editorRef.current;
+    if (!editor || !corRangeRef.current) return;
+    editor.focus();
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(corRangeRef.current);
+    document.execCommand("foreColor", false, hex);
+    emitChange();
+  }
+
+  function abrirCorFundo() {
+    corCelulaRef.current = localizarCelula();
+    if (corCelulaRef.current) corFundoInputRef.current?.click();
+  }
+
+  function aplicarCorFundo(hex: string) {
+    if (corCelulaRef.current) {
+      corCelulaRef.current.style.backgroundColor = hex;
+      emitChange();
+    }
+  }
+
+  function removerCorFundo() {
+    const celula = localizarCelula();
+    if (celula) {
+      celula.style.backgroundColor = "";
+      emitChange();
+    }
+  }
+
   return (
     <div className="relative rounded-xl border border-slate-300 bg-white">
       <div className="flex items-center gap-0.5 border-b border-slate-200 p-1">
@@ -141,6 +193,32 @@ export function RichTextEditor({
         <ToolbarButton title="Remover tabela (clique dentro dela antes)" onMouseDown={removerTabela}>
           <Trash2 size={15} />
         </ToolbarButton>
+        <div className="mx-1 h-5 w-px bg-slate-200" />
+        <ToolbarButton title="Cor do texto" onMouseDown={abrirCorTexto}>
+          <Baseline size={15} />
+        </ToolbarButton>
+        <ToolbarButton title="Cor de fundo da célula (clique dentro dela antes)" onMouseDown={abrirCorFundo}>
+          <PaintBucket size={15} />
+        </ToolbarButton>
+        <ToolbarButton title="Remover cor de fundo da célula" onMouseDown={removerCorFundo}>
+          <Eraser size={15} />
+        </ToolbarButton>
+        <input
+          ref={corTextoInputRef}
+          type="color"
+          onChange={(e) => aplicarCorTexto(e.target.value)}
+          className="absolute h-0 w-0 opacity-0"
+          tabIndex={-1}
+          aria-hidden="true"
+        />
+        <input
+          ref={corFundoInputRef}
+          type="color"
+          onChange={(e) => aplicarCorFundo(e.target.value)}
+          className="absolute h-0 w-0 opacity-0"
+          tabIndex={-1}
+          aria-hidden="true"
+        />
       </div>
 
       {tabelaAberta && (
