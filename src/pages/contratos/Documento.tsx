@@ -134,7 +134,6 @@ export function ContratoDocumentoPage() {
       const letterheadDataUrl = await fetchLetterheadDataUrl();
       const blob = gerarContratoPdfBlob(clausulas, { letterheadDataUrl, cabecalho });
       const fileName = `CONTRATO${contrato?.numero_contrato ? " " + contrato.numero_contrato.replace("/", "-") : ""}.pdf`;
-      await salvarArquivoNoDrive(blob, fileName);
       downloadBlob(blob, fileName);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao exportar PDF.");
@@ -326,7 +325,7 @@ export function ContratoDocumentoPage() {
               Imprimir
             </Button>
             <Button type="button" variant="secondary" onClick={exportarPDF} disabled={exportando !== null}>
-              {exportando === "pdf" ? "Salvando no Drive..." : "Exportar PDF e salvar no Drive"}
+              {exportando === "pdf" ? "Exportando..." : "Exportar PDF"}
             </Button>
             <Button type="button" variant="secondary" onClick={exportarWord} disabled={exportando !== null}>
               {exportando === "docx" ? "Exportando..." : "Exportar Word"}
