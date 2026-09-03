@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { PageHeader, Card, Field, Input, Table, Th, Td, EmptyState, Badge, Button, LoadingState, TableToolbar } from "@/components/ui";
-import { formatBRL, formatDate, formatMonth, todayISO } from "@/lib/format";
+import { firstDayOfMonthISO, formatBRL, formatDate, formatMonth, lastDayOfMonthISO, todayISO } from "@/lib/format";
 import type { PagamentoMensal } from "@/lib/types";
 import { useAuth } from "@/lib/auth";
 import { normalizeSearch } from "@/lib/forms";
@@ -29,8 +29,8 @@ export function PagamentosListPage() {
   const [search, setSearch] = useState("");
   const [tipo, setTipo] = useState("");
   const [statusFiltro, setStatusFiltro] = useState<StatusFiltro>("a_vencer");
-  const [dataInicio, setDataInicio] = useState("");
-  const [dataFim, setDataFim] = useState("");
+  const [dataInicio, setDataInicio] = useState(firstDayOfMonthISO());
+  const [dataFim, setDataFim] = useState(lastDayOfMonthISO());
   const hoje = todayISO();
   const filtered = useMemo(() => (data ?? []).filter((item) => {
     const contrato = item.contratos;

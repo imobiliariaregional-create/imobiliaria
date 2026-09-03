@@ -40,6 +40,11 @@ export function firstDayOfMonthISO(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`;
 }
 
+export function lastDayOfMonthISO(date = new Date()) {
+  const ultimoDia = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(ultimoDia).padStart(2, "0")}`;
+}
+
 export function addMonthsISO(iso: string, months: number) {
   const [y, m, d] = iso.split("-").map(Number);
   const target = new Date(y, m - 1 + months, 1);
