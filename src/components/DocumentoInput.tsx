@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button, Field, Input } from "@/components/ui";
-import { formatCPFCNPJ, getDraftValue, validateCPFCNPJ } from "@/lib/forms";
+import { formatCPFCNPJ, getDraftValue, onlyDigits, validateCPFCNPJ } from "@/lib/forms";
 import type { TipoPessoa } from "@/lib/types";
 
 export function DocumentoInput({
@@ -59,10 +59,31 @@ export function DocumentoInput({
         maxLength={tipo === "juridica" ? 18 : 14}
         value={value}
         placeholder={tipo === "juridica" ? "00.000.000/0000-00" : "000.000.000-00"}
-        onChange={(event) => {
-          const formatted = formatCPFCNPJ(event.target.value, tipo);
+        onInput={(event) => {
+          const input = event.currentTarget;
+          const cursorPos = input.selectionStart ?? input.value.length;
+          const digitsAntesDoCursor = onlyDigits(input.value.slice(0, cursorPos)).length;
+          const formatted = formatCPFCNPJ(input.value, tipo);
+
+          let novaPos = 0;
+          if (digitsAntesDoCursor > 0) {
+            let contados = 0;
+            novaPos = formatted.length;
+            for (let i = 0; i < formatted.length; i++) {
+              if (/\d/.test(formatted[i])) {
+                contados++;
+                if (contados === digitsAntesDoCursor) {
+                  novaPos = i + 1;
+                  break;
+                }
+              }
+            }
+          }
+
+          input.value = formatted;
+          input.setSelectionRange(novaPos, novaPos);
           setValue(formatted);
-          event.target.setCustomValidity("");
+          input.setCustomValidity("");
         }}
         onBlur={(event) => validate(event.currentTarget)}
         onInvalid={(event) => validate(event.currentTarget)}

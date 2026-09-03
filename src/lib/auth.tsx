@@ -32,15 +32,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
+    let currentUserId: string | undefined;
+
     supabase.auth.getSession().then(({ data }) => {
+      currentUserId = data.session?.user.id;
       setSession(data.session);
-      void loadPerfil(data.session?.user.id);
+      void loadPerfil(currentUserId);
       setLoading(false);
     });
 
+    // O Supabase revalida a sessão sempre que a aba volta a ficar visível, disparando este
+    // evento mesmo sem nada ter mudado — só recarrega o perfil se o usuário realmente mudou,
+    // pra não mostrar "Carregando..." de novo toda vez que o usuário troca de aba e volta.
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
-      void loadPerfil(newSession?.user.id);
+      if (newSession?.user.id === currentUserId) return;
+      currentUserId = newSession?.user.id;
+      void loadPerfil(currentUserId);
     });
 
     return () => subscription.subscription.unsubscribe();
