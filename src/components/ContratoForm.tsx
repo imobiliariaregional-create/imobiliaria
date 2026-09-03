@@ -58,7 +58,7 @@ export function ContratoForm({
   );
   const [duracaoMeses, setDuracaoMeses] = useState<string | number>(() => getDraftValue(draftId, "duracao_meses", String(defaultValues?.duracao_meses ?? "")));
   const [dataInicio, setDataInicio] = useState(() => getDraftValue(draftId, "data_inicio", defaultValues?.data_inicio ?? todayISO()));
-  const [recebimentoAluguel, setRecebimentoAluguel] = useState(() => getDraftValue(draftId, "recebimento_aluguel", defaultValues?.recebimento_aluguel ?? "imobiliaria"));
+  const [recebimentoAluguel, setRecebimentoAluguel] = useState(() => getDraftValue(draftId, "recebimento_aluguel", defaultValues?.recebimento_aluguel ?? "proprietario"));
   const [modalImovel, setModalImovel] = useState(false);
   const [modalPessoa, setModalPessoa] = useState(false);
   const [pending, setPending] = useState(false);
