@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
-import { PageHeader, Card, Table, Th, Td, EmptyState, Badge, Button, LoadingState, TableToolbar } from "@/components/ui";
+import { PageHeader, Card, Field, Input, Table, Th, Td, EmptyState, Badge, Button, LoadingState, TableToolbar } from "@/components/ui";
 import { formatBRL, formatDate, formatMonth, todayISO } from "@/lib/format";
 import type { PagamentoMensal } from "@/lib/types";
 import { useAuth } from "@/lib/auth";
@@ -14,17 +14,36 @@ const tipoLabel: Record<string, string> = {
   venda: "Venda",
 };
 
+type StatusFiltro = "a_vencer" | "vencidos" | "liquidados" | "todos";
+
+const statusFiltroLabel: Record<StatusFiltro, string> = {
+  a_vencer: "A vencer",
+  vencidos: "Vencidos",
+  liquidados: "Liquidados",
+  todos: "Todos",
+};
+
 export function PagamentosListPage() {
   const { papel } = useAuth();
   const [data, setData] = useState<PagamentoMensal[] | null>(null);
   const [search, setSearch] = useState("");
   const [tipo, setTipo] = useState("");
+  const [statusFiltro, setStatusFiltro] = useState<StatusFiltro>("a_vencer");
+  const [dataInicio, setDataInicio] = useState("");
+  const [dataFim, setDataFim] = useState("");
   const hoje = todayISO();
   const filtered = useMemo(() => (data ?? []).filter((item) => {
     const contrato = item.contratos;
     const haystack = normalizeSearch([contrato?.pessoas?.nome, contrato?.imoveis ? enderecoImovel(contrato.imoveis) : "", item.status, item.mes_referencia].join(" "));
-    return (!tipo || contrato?.tipo === tipo) && haystack.includes(normalizeSearch(search));
-  }), [data, search, tipo]);
+    const atrasado = item.status === "pendente" && item.data_vencimento < hoje;
+    const statusOk =
+      statusFiltro === "todos" ? true :
+      statusFiltro === "liquidados" ? item.status === "pago" :
+      statusFiltro === "vencidos" ? atrasado :
+      item.status === "pendente" && !atrasado;
+    const periodoOk = (!dataInicio || item.data_vencimento >= dataInicio) && (!dataFim || item.data_vencimento <= dataFim);
+    return (!tipo || contrato?.tipo === tipo) && statusOk && periodoOk && haystack.includes(normalizeSearch(search));
+  }), [data, search, tipo, statusFiltro, dataInicio, dataFim, hoje]);
 
   async function reload() {
     const { data } = await supabase
@@ -59,6 +78,33 @@ export function PagamentosListPage() {
   return (
     <div>
       <PageHeader title="Pagamentos (valores a receber pela imobiliária)" />
+      <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-wrap gap-2">
+          {(Object.entries(statusFiltroLabel) as [StatusFiltro, string][]).map(([value, label]) => (
+            <Button
+              key={value}
+              type="button"
+              variant={statusFiltro === value ? "primary" : "secondary"}
+              onClick={() => setStatusFiltro(value)}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+        <div className="flex items-end gap-2">
+          <Field label="Vencimento de" htmlFor="periodo_inicio">
+            <Input id="periodo_inicio" type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
+          </Field>
+          <Field label="até" htmlFor="periodo_fim">
+            <Input id="periodo_fim" type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} />
+          </Field>
+          {(dataInicio || dataFim) && (
+            <Button type="button" variant="secondary" onClick={() => { setDataInicio(""); setDataFim(""); }}>
+              Limpar período
+            </Button>
+          )}
+        </div>
+      </div>
       <TableToolbar search={search} onSearch={setSearch} total={data?.length ?? 0} shown={filtered.length} filter={tipo} onFilter={setTipo} options={Object.entries(tipoLabel).map(([value, label]) => ({ value, label }))} />
       <Card>
         {data === null ? (
