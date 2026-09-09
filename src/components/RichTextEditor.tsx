@@ -26,6 +26,8 @@ function ToolbarButton({
   );
 }
 
+const COR_TEXTO_PADRAO = "#17201c";
+
 function montarTabelaHtml(linhas: number, colunas: number): string {
   const celula = `<td style="border:1px solid #94a3b8;padding:6px 8px;min-width:60px;">&nbsp;</td>`;
   const linha = `<tr>${celula.repeat(colunas)}</tr>`;
@@ -156,12 +158,17 @@ export function RichTextEditor({
     }
   }
 
-  function removerCorFundo() {
-    const celula = localizarCelula();
-    if (celula) {
-      celula.style.backgroundColor = "";
-      emitChange();
+  /** Remove cor do texto selecionado (volta ao padrão) e, se o cursor estiver numa célula, também limpa o fundo dela. */
+  function removerFormatacaoDeCor() {
+    const editor = editorRef.current;
+    const sel = window.getSelection();
+    if (editor && sel && sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
+      editor.focus();
+      document.execCommand("foreColor", false, COR_TEXTO_PADRAO);
     }
+    const celula = localizarCelula();
+    if (celula) celula.style.backgroundColor = "";
+    emitChange();
   }
 
   return (
@@ -200,7 +207,7 @@ export function RichTextEditor({
         <ToolbarButton title="Cor de fundo da célula (clique dentro dela antes)" onMouseDown={abrirCorFundo}>
           <PaintBucket size={15} />
         </ToolbarButton>
-        <ToolbarButton title="Remover cor de fundo da célula" onMouseDown={removerCorFundo}>
+        <ToolbarButton title="Remover cor do texto selecionado (e do fundo da célula, se estiver numa)" onMouseDown={removerFormatacaoDeCor}>
           <Eraser size={15} />
         </ToolbarButton>
         <input

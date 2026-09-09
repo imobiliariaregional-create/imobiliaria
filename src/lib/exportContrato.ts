@@ -211,6 +211,7 @@ function criarDocumentoPDF(
   }
 
   function desenharTabela(block: TableBlock) {
+    let paginasAntes = doc.getNumberOfPages();
     autoTable(doc, {
       startY: y,
       margin: { left: MARGIN_LEFT_MM, right: MARGIN_RIGHT_MM, bottom: MARGIN_BOTTOM_MM, top: topoConteudoPadrao },
@@ -218,7 +219,13 @@ function criarDocumentoPDF(
       theme: "grid",
       styles: { fontSize: 9, cellPadding: 2, lineColor: [148, 163, 184], lineWidth: 0.2, textColor: COR_TEXTO_PADRAO },
       willDrawPage: () => {
-        drawPageChrome();
+        // Só redesenha o timbrado/cabeçalho quando a tabela realmente abre uma página nova —
+        // redesenhar na página atual apagaria (por cima) o conteúdo que já tinha sido escrito ali.
+        const paginasAgora = doc.getNumberOfPages();
+        if (paginasAgora > paginasAntes) {
+          drawPageChrome();
+          paginasAntes = paginasAgora;
+        }
       },
       didParseCell: (data) => {
         const celula = block.rows[data.row.index]?.[data.column.index];
