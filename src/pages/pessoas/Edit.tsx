@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { PageHeader, Button, Card, LoadingState } from "@/components/ui";
-import { PessoaForm } from "@/components/PessoaForm";
+import { PessoaForm, type PessoaPayload } from "@/components/PessoaForm";
 import type { Pessoa } from "@/lib/types";
 import { confirmDeletion } from "@/lib/actions";
 import { useAuth } from "@/lib/auth";
@@ -17,7 +17,7 @@ export function EditarPessoaPage() {
     supabase.from("pessoas").select("*").eq("id", id).single<Pessoa>().then(({ data }) => setData(data));
   }, [id]);
 
-  async function handleSubmit(payload: Omit<Pessoa, "id" | "created_at">) {
+  async function handleSubmit(payload: PessoaPayload) {
     const { error } = await supabase.from("pessoas").update(payload).eq("id", id);
     if (error) throw new Error(error.message);
     navigate("/pessoas");

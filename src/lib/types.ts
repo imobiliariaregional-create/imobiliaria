@@ -56,6 +56,7 @@ export interface Pessoa {
   representante_nome: string | null;
   representante_cpf: string | null;
   representante_rg: string | null;
+  asaas_customer_id: string | null;
   created_at: string;
 }
 
@@ -117,6 +118,10 @@ export interface PagamentoMensal {
   status: StatusPagamento;
   valor_repassado: number | null;
   data_repasse: string | null;
+  asaas_charge_id: string | null;
+  asaas_status: string | null;
+  asaas_boleto_url: string | null;
+  asaas_linha_digitavel: string | null;
   created_at: string;
   contratos?: Contrato | null;
 }

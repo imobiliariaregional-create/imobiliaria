@@ -1,12 +1,26 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
-import { PageHeader, Card, Field, Input, Table, Th, Td, EmptyState, Badge, Button, LoadingState, TableToolbar } from "@/components/ui";
+import { PageHeader, Card, Field, Input, Table, Th, Td, EmptyState, Badge, Button, LoadingState, ErrorState, TableToolbar } from "@/components/ui";
 import { firstDayOfMonthISO, formatBRL, formatDate, formatMonth, lastDayOfMonthISO, todayISO } from "@/lib/format";
 import type { PagamentoMensal } from "@/lib/types";
 import { useAuth } from "@/lib/auth";
 import { normalizeSearch } from "@/lib/forms";
 import { enderecoImovel } from "@/lib/imovelLabel";
+import { gerarBoleto, consultarStatusBoleto } from "@/lib/asaas";
+
+const ASAAS_STATUS_LABEL: Record<string, string> = {
+  PENDING: "Aguardando pagamento",
+  RECEIVED: "Recebido",
+  CONFIRMED: "Confirmado",
+  OVERDUE: "Vencido",
+  REFUNDED: "Estornado",
+};
+
+/** Contratos de administração com repasse direto ao proprietário ainda não têm split configurado. */
+function podeGerarBoleto(p: PagamentoMensal): boolean {
+  return p.contratos?.tipo !== "administracao" || p.contratos.recebimento_aluguel === "imobiliaria";
+}
 
 const tipoLabel: Record<string, string> = {
   aluguel: "Aluguel",
@@ -31,6 +45,8 @@ export function PagamentosListPage() {
   const [statusFiltro, setStatusFiltro] = useState<StatusFiltro>("a_vencer");
   const [dataInicio, setDataInicio] = useState(firstDayOfMonthISO());
   const [dataFim, setDataFim] = useState(lastDayOfMonthISO());
+  const [boletoPendingId, setBoletoPendingId] = useState<string | null>(null);
+  const [erroBoleto, setErroBoleto] = useState<string | null>(null);
   const hoje = todayISO();
   const filtered = useMemo(() => (data ?? []).filter((item) => {
     const contrato = item.contratos;
@@ -75,6 +91,33 @@ export function PagamentosListPage() {
     reload();
   }
 
+  async function handleGerarBoleto(p: PagamentoMensal) {
+    setErroBoleto(null);
+    setBoletoPendingId(p.id);
+    try {
+      await gerarBoleto(p.id);
+      await reload();
+    } catch (err) {
+      setErroBoleto(err instanceof Error ? err.message : "Erro ao gerar boleto.");
+    } finally {
+      setBoletoPendingId(null);
+    }
+  }
+
+  async function handleAtualizarStatusBoleto(p: PagamentoMensal) {
+    if (!p.asaas_charge_id) return;
+    setErroBoleto(null);
+    setBoletoPendingId(p.id);
+    try {
+      await consultarStatusBoleto(p.asaas_charge_id);
+      await reload();
+    } catch (err) {
+      setErroBoleto(err instanceof Error ? err.message : "Erro ao consultar status do boleto.");
+    } finally {
+      setBoletoPendingId(null);
+    }
+  }
+
   return (
     <div>
       <PageHeader title="Pagamentos (valores a receber pela imobiliária)" />
@@ -106,6 +149,7 @@ export function PagamentosListPage() {
         </div>
       </div>
       <TableToolbar search={search} onSearch={setSearch} total={data?.length ?? 0} shown={filtered.length} filter={tipo} onFilter={setTipo} options={Object.entries(tipoLabel).map(([value, label]) => ({ value, label }))} />
+      {erroBoleto && <ErrorState message={erroBoleto} />}
       <Card>
         {data === null ? (
           <LoadingState />
@@ -121,6 +165,7 @@ export function PagamentosListPage() {
                 <Th>Receita da imobiliária</Th>
                 <Th>Vencimento</Th>
                 <Th>Status</Th>
+                <Th>Boleto</Th>
                 <Th>Ação</Th>
               </tr>
             </thead>
@@ -150,6 +195,44 @@ export function PagamentosListPage() {
                           ? p.contratos?.tipo === "administracao" && p.contratos.recebimento_aluguel === "imobiliaria" ? "aluguel recebido" : "receita recebida"
                           : atrasado ? "atrasado" : "pendente"}
                       </Badge>
+                    </Td>
+                    <Td>
+                      {!podeGerarBoleto(p) ? (
+                        <span className="text-xs text-slate-400">Indisponível (repasse direto)</span>
+                      ) : !p.asaas_charge_id ? (
+                        (papel === "admin" || papel === "financeiro") ? (
+                          <Button type="button" variant="secondary" disabled={boletoPendingId === p.id} onClick={() => handleGerarBoleto(p)}>
+                            {boletoPendingId === p.id ? "Gerando..." : "Gerar boleto"}
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-slate-400">—</span>
+                        )
+                      ) : (
+                        <div className="flex flex-col gap-1 text-xs">
+                          <Badge color={p.asaas_status === "RECEIVED" || p.asaas_status === "CONFIRMED" ? "green" : p.asaas_status === "OVERDUE" ? "red" : "yellow"}>
+                            {ASAAS_STATUS_LABEL[p.asaas_status ?? ""] ?? p.asaas_status}
+                          </Badge>
+                          <div className="flex flex-wrap gap-2">
+                            {p.asaas_boleto_url && (
+                              <a href={p.asaas_boleto_url} target="_blank" rel="noreferrer" className="text-brand-700 hover:underline">
+                                Ver boleto
+                              </a>
+                            )}
+                            {p.asaas_linha_digitavel && (
+                              <button
+                                type="button"
+                                className="text-brand-700 hover:underline"
+                                onClick={() => navigator.clipboard.writeText(p.asaas_linha_digitavel!)}
+                              >
+                                Copiar linha digitável
+                              </button>
+                            )}
+                            <button type="button" className="text-slate-500 hover:underline" disabled={boletoPendingId === p.id} onClick={() => handleAtualizarStatusBoleto(p)}>
+                              {boletoPendingId === p.id ? "Atualizando..." : "Atualizar"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </Td>
                     <Td>
                       {(papel === "admin" || papel === "financeiro") ? <Button

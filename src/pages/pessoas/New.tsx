@@ -1,15 +1,14 @@
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { PageHeader, ErrorState, LoadingState } from "@/components/ui";
-import { PessoaForm } from "@/components/PessoaForm";
-import type { Pessoa } from "@/lib/types";
+import { PessoaForm, type PessoaPayload } from "@/components/PessoaForm";
 import { useAuth } from "@/lib/auth";
 
 export function NovaPessoaPage() {
   const { papel, perfilLoading } = useAuth();
   const navigate = useNavigate();
 
-  async function handleSubmit(data: Omit<Pessoa, "id" | "created_at">) {
+  async function handleSubmit(data: PessoaPayload) {
     const { error } = await supabase.from("pessoas").insert(data);
     if (error) throw new Error(error.message);
     navigate("/pessoas");

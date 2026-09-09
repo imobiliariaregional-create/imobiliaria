@@ -6,7 +6,7 @@ import { applyFormValues, getDraftValue, upper, upperOrNull, useFormDraft, valid
 import { consultarCNPJ } from "@/lib/cnpj";
 import { PhoneInput } from "@/components/PhoneInput";
 
-export type PessoaPayload = Omit<Pessoa, "id" | "created_at">;
+export type PessoaPayload = Omit<Pessoa, "id" | "created_at" | "asaas_customer_id">;
 
 export function PessoaForm({
   onSubmit,
