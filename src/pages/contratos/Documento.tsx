@@ -11,6 +11,7 @@ import { fetchLetterheadDataUrl } from "@/lib/letterhead";
 import { downloadBlob, exportContratoDocx, gerarContratoPdfBase64, gerarContratoPdfBlob } from "@/lib/exportContrato";
 import { enviarParaAssinatura, consultarStatusAssinatura, obterDocumentoAssinado, blobParaBase64, STATUS_LABEL } from "@/lib/assinafy";
 import { deleteDriveFile, downloadDriveFile, getDriveFileBlob, uploadDriveFile, type DriveUploadOptions } from "@/lib/googleDrive";
+import { confirmDeletion } from "@/lib/actions";
 import type { Contrato, ContratoGerado, ModeloContrato } from "@/lib/types";
 import type { CabecalhoDocumento } from "@/lib/contratoDocumento";
 
@@ -280,6 +281,26 @@ export function ContratoDocumentoPage() {
     }
   }
 
+  async function excluirDocumento() {
+    if (!gerado) return;
+    if (!confirmDeletion("Excluir o documento gerado deste contrato? Você poderá gerar ou importar um novo depois.")) return;
+    setPending(true);
+    setError(null);
+    try {
+      if (gerado.drive_file_id) await deleteDriveFile(gerado.drive_file_id, driveOptions().category);
+      if (gerado.arquivo_importado_drive_file_id) await deleteDriveFile(gerado.arquivo_importado_drive_file_id, driveOptions().category);
+      const { error } = await supabase.from("contratos_gerados").delete().eq("id", gerado.id);
+      if (error) throw new Error(error.message);
+      setGerado(null);
+      setConteudo("");
+      sessionStorage.removeItem(draftKey);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao excluir documento.");
+    } finally {
+      setPending(false);
+    }
+  }
+
   function driveOptions(): DriveUploadOptions {
     const owner = contrato?.imoveis?.proprietarios?.nome ?? "SEM PROPRIETARIO";
     const address = contrato?.imoveis ? enderecoImovel(contrato.imoveis) : "SEM ENDERECO";
@@ -421,6 +442,9 @@ export function ContratoDocumentoPage() {
                 )}
               </>
             )}
+            <Button type="button" variant="danger" onClick={excluirDocumento} disabled={pending}>
+              Excluir documento
+            </Button>
           </div>
           {error && <ErrorState message={error} />}
 
