@@ -21,7 +21,7 @@ import {
   TextWrappingSide,
 } from "docx";
 import { parseClauseHtml, runsToPlainText, type Align, type ContentBlock, type ParagraphBlock, type TableBlock, type TableCell as ClauseTableCell, type TextRun } from "@/lib/richText";
-import { linhasCabecalho, tituloDocumento, type CabecalhoDocumento } from "@/lib/contratoDocumento";
+import { linhasCabecalho, type CabecalhoDocumento } from "@/lib/contratoDocumento";
 
 const COR_TEXTO_PADRAO: [number, number, number] = [23, 32, 28];
 
@@ -171,12 +171,6 @@ function criarDocumentoPDF(
         yCabecalho += lineHeight * 0.85;
       }
       yCabecalho += lineHeight * 0.5;
-      if (doc.getNumberOfPages() === 1) {
-        doc.setFontSize(13);
-        doc.setFont("helvetica", "bold");
-        doc.text(tituloDocumento(opts.cabecalho.tipoOperacao), pageWidth / 2, yCabecalho, { align: "center" });
-        yCabecalho += lineHeight * 1.6;
-      }
       doc.setFontSize(fontSize);
       doc.setFont("helvetica", "normal");
       topoConteudo = yCabecalho;
@@ -368,22 +362,10 @@ export async function gerarContratoDocxBlob(
 ) {
   const children: (Paragraph | Table)[] = [];
 
-  if (opts.cabecalho) {
-    children.push(
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        children: [new DocxTextRun({ text: tituloDocumento(opts.cabecalho.tipoOperacao), bold: true })],
-        spacing: { after: 200 },
-      })
-    );
-  }
-
   for (const block of parseClauseHtml(conteudo)) {
     children.push(block.type === "table" ? tableFromBlock(block) : paragraphFromBlock(block));
   }
 
-  // Numero/data/tipo repetem em toda pagina (cabecalho de verdade); o titulo grande fica
-  // so no topo do corpo, uma vez, ja que repeti-lo em toda pagina ficava redundante.
   const headerChildren: Paragraph[] = [];
   if (opts.letterheadDataUrl) {
     headerChildren.push(new Paragraph({ children: [await letterheadImageRun(opts.letterheadDataUrl)] }));

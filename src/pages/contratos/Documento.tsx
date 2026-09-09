@@ -332,7 +332,6 @@ export function ContratoDocumentoPage() {
         numeroContrato: contrato.numero_contrato,
         data: gerado.created_at,
         tipoImovel: contrato.imoveis?.tipo_imovel ?? null,
-        tipoOperacao: contrato.tipo,
       }
     : undefined;
 
