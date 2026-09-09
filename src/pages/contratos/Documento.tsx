@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { PageHeader, Card, Field, Select, Input, Button, Badge, LoadingState, ErrorState } from "@/components/ui";
 import { Modal } from "@/components/Modal";
-import { ClausulasEditor } from "@/components/ClausulasEditor";
+import { RichTextEditor } from "@/components/RichTextEditor";
 import { DocumentoContratoView } from "@/components/DocumentoContratoView";
 import { resolverPlaceholders, substituirPlaceholders } from "@/lib/placeholders";
 import { enderecoImovel, imovelLabel } from "@/lib/imovelLabel";
@@ -11,7 +11,7 @@ import { fetchLetterheadDataUrl } from "@/lib/letterhead";
 import { downloadBlob, exportContratoDocx, gerarContratoPdfBase64, gerarContratoPdfBlob } from "@/lib/exportContrato";
 import { enviarParaAssinatura, consultarStatusAssinatura, obterDocumentoAssinado, blobParaBase64, STATUS_LABEL } from "@/lib/assinafy";
 import { deleteDriveFile, downloadDriveFile, getDriveFileBlob, uploadDriveFile, type DriveUploadOptions } from "@/lib/googleDrive";
-import type { ClausulaDocumento, Contrato, ContratoGerado, ModeloContrato } from "@/lib/types";
+import type { Contrato, ContratoGerado, ModeloContrato } from "@/lib/types";
 import type { CabecalhoDocumento } from "@/lib/contratoDocumento";
 
 export function ContratoDocumentoPage() {
@@ -22,7 +22,7 @@ export function ContratoDocumentoPage() {
   const [modelos, setModelos] = useState<ModeloContrato[]>([]);
   const [modeloId, setModeloId] = useState("");
   const [gerado, setGerado] = useState<ContratoGerado | null | undefined>(undefined);
-  const [clausulas, setClausulas] = useState<ClausulaDocumento[]>([]);
+  const [conteudo, setConteudo] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exportando, setExportando] = useState<"pdf" | "docx" | null>(null);
@@ -44,13 +44,8 @@ export function ContratoDocumentoPage() {
     setContrato(contratoRes.data);
     setGerado(geradoRes.data ?? null);
     if (geradoRes.data) {
-      try {
-        const draft = sessionStorage.getItem(draftKey);
-        setClausulas(draft ? JSON.parse(draft) : geradoRes.data.clausulas);
-      } catch {
-        sessionStorage.removeItem(draftKey);
-        setClausulas(geradoRes.data.clausulas);
-      }
+      const draft = sessionStorage.getItem(draftKey);
+      setConteudo(draft ?? geradoRes.data.conteudo);
     }
 
     if (contratoRes.data) {
@@ -86,20 +81,16 @@ export function ContratoDocumentoPage() {
         proprietario,
         pessoa: contrato.pessoas ?? null,
       });
-      const clausulasGeradas: ClausulaDocumento[] = modelo.clausulas.map((c) => ({
-        id: c.id,
-        titulo: c.titulo ? substituirPlaceholders(c.titulo, valores) : c.titulo,
-        texto: substituirPlaceholders(c.texto, valores),
-      }));
+      const conteudoGerado = substituirPlaceholders(modelo.conteudo, valores);
 
       const { data, error } = await supabase
         .from("contratos_gerados")
-        .insert({ contrato_id: id, modelo_id: modeloId, clausulas: clausulasGeradas })
+        .insert({ contrato_id: id, modelo_id: modeloId, conteudo: conteudoGerado })
         .select("*")
         .single<ContratoGerado>();
       if (error) throw new Error(error.message);
       setGerado(data);
-      setClausulas(data.clausulas);
+      setConteudo(data.conteudo);
       sessionStorage.removeItem(draftKey);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao gerar documento.");
@@ -123,7 +114,7 @@ export function ContratoDocumentoPage() {
       };
       const query = gerado
         ? supabase.from("contratos_gerados").update(dadosArquivo).eq("id", gerado.id)
-        : supabase.from("contratos_gerados").insert({ contrato_id: id, modelo_id: null, clausulas: [], origem: "importado", ...dadosArquivo });
+        : supabase.from("contratos_gerados").insert({ contrato_id: id, modelo_id: null, conteudo: "", origem: "importado", ...dadosArquivo });
       const { data, error } = await query.select("*").single<ContratoGerado>();
       if (error) throw new Error(error.message);
       const previousId = gerado?.arquivo_importado_drive_file_id;
@@ -142,7 +133,7 @@ export function ContratoDocumentoPage() {
     setPending(true);
     setError(null);
     try {
-      const { error } = await supabase.from("contratos_gerados").update({ clausulas }).eq("id", gerado.id);
+      const { error } = await supabase.from("contratos_gerados").update({ conteudo }).eq("id", gerado.id);
       if (error) throw new Error(error.message);
       sessionStorage.removeItem(draftKey);
     } catch (err) {
@@ -152,9 +143,9 @@ export function ContratoDocumentoPage() {
     }
   }
 
-  function handleClausulasChange(next: ClausulaDocumento[]) {
-    setClausulas(next);
-    sessionStorage.setItem(draftKey, JSON.stringify(next));
+  function handleConteudoChange(next: string) {
+    setConteudo(next);
+    sessionStorage.setItem(draftKey, next);
   }
 
   async function exportarPDF() {
@@ -162,7 +153,7 @@ export function ContratoDocumentoPage() {
     setError(null);
     try {
       const letterheadDataUrl = await fetchLetterheadDataUrl();
-      const blob = gerarContratoPdfBlob(clausulas, { letterheadDataUrl, cabecalho });
+      const blob = gerarContratoPdfBlob(conteudo, { letterheadDataUrl, cabecalho });
       const fileName = `CONTRATO${contrato?.numero_contrato ? " " + contrato.numero_contrato.replace("/", "-") : ""}.pdf`;
       downloadBlob(blob, fileName);
     } catch (err) {
@@ -177,7 +168,7 @@ export function ContratoDocumentoPage() {
     setError(null);
     try {
       const letterheadDataUrl = await fetchLetterheadDataUrl();
-      await exportContratoDocx(clausulas, { numeroContrato: contrato?.numero_contrato, letterheadDataUrl, cabecalho });
+      await exportContratoDocx(conteudo, { numeroContrato: contrato?.numero_contrato, letterheadDataUrl, cabecalho });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao exportar Word.");
     } finally {
@@ -224,7 +215,7 @@ export function ContratoDocumentoPage() {
         pdfBase64 = await blobParaBase64(blob);
       } else {
         const letterheadDataUrl = await fetchLetterheadDataUrl();
-        pdfBase64 = gerarContratoPdfBase64(clausulas, { letterheadDataUrl, cabecalho });
+        pdfBase64 = gerarContratoPdfBase64(conteudo, { letterheadDataUrl, cabecalho });
       }
       const fileName = `contrato${contrato.numero_contrato ? "-" + contrato.numero_contrato.replace("/", "-") : ""}.pdf`;
 
@@ -508,14 +499,14 @@ export function ContratoDocumentoPage() {
           {gerado.origem !== "importado" && (
             <>
               <div className="print:hidden">
-                <p className="text-sm font-medium text-slate-700 mb-2">Editar cláusulas</p>
-                <ClausulasEditor clausulas={clausulas} onChange={handleClausulasChange} />
+                <p className="text-sm font-medium text-slate-700 mb-2">Editar conteúdo do contrato</p>
+                <RichTextEditor value={conteudo} onChange={handleConteudoChange} placeholder="Digite o contrato aqui, do jeito que ficaria no Word." />
               </div>
 
               <div>
                 <p className="text-sm font-medium text-slate-700 mb-2 print:hidden">Pré-visualização</p>
                 <Card className="print:shadow-none print:border-none">
-                  <DocumentoContratoView clausulas={clausulas} cabecalho={cabecalho} />
+                  <DocumentoContratoView conteudo={conteudo} cabecalho={cabecalho} />
                 </Card>
               </div>
             </>

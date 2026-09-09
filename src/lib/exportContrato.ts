@@ -20,7 +20,6 @@ import {
   TextWrappingType,
   TextWrappingSide,
 } from "docx";
-import type { ClausulaDocumento } from "@/lib/types";
 import { parseClauseHtml, runsToPlainText, type Align, type ContentBlock, type ParagraphBlock, type TableBlock, type TableCell as ClauseTableCell, type TextRun } from "@/lib/richText";
 import { linhasCabecalho, tituloDocumento, type CabecalhoDocumento } from "@/lib/contratoDocumento";
 
@@ -147,7 +146,7 @@ function desenharLinhaComEstilo(doc: jsPDF, linha: Word[], x: number, y: number,
 }
 
 function criarDocumentoPDF(
-  clausulas: ClausulaDocumento[],
+  conteudo: string,
   opts: { letterheadDataUrl?: string | null; cabecalho?: CabecalhoDocumento }
 ): jsPDF {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
@@ -240,45 +239,35 @@ function criarDocumentoPDF(
     y = (doc as any).lastAutoTable.finalY + lineHeight * 0.6;
   }
 
-  for (const clausula of clausulas) {
-    if (clausula.titulo) {
-      ensureSpace(lineHeight * 1.3);
-      doc.setFont("helvetica", "bold");
-      doc.text(clausula.titulo, MARGIN_LEFT_MM, y);
-      y += lineHeight;
-      doc.setFont("helvetica", "normal");
-    }
-    const blocks: ContentBlock[] = parseClauseHtml(clausula.texto);
-    for (const block of blocks) {
-      if (block.type === "table") desenharTabela(block);
-      else desenharParagrafo(block);
-    }
-    y += lineHeight * 0.6;
+  const blocks: ContentBlock[] = parseClauseHtml(conteudo);
+  for (const block of blocks) {
+    if (block.type === "table") desenharTabela(block);
+    else desenharParagrafo(block);
   }
 
   return doc;
 }
 
 export function exportContratoPDF(
-  clausulas: ClausulaDocumento[],
+  conteudo: string,
   opts: { numeroContrato?: string | null; letterheadDataUrl?: string | null; cabecalho?: CabecalhoDocumento }
 ) {
-  downloadBlob(gerarContratoPdfBlob(clausulas, opts), nomeArquivo(opts.numeroContrato, "pdf"));
+  downloadBlob(gerarContratoPdfBlob(conteudo, opts), nomeArquivo(opts.numeroContrato, "pdf"));
 }
 
 export function gerarContratoPdfBlob(
-  clausulas: ClausulaDocumento[],
+  conteudo: string,
   opts: { letterheadDataUrl?: string | null; cabecalho?: CabecalhoDocumento }
 ): Blob {
-  return criarDocumentoPDF(clausulas, opts).output("blob");
+  return criarDocumentoPDF(conteudo, opts).output("blob");
 }
 
 /** Gera o mesmo PDF em base64 (sem disparar download) — usado para enviar para assinatura digital. */
 export function gerarContratoPdfBase64(
-  clausulas: ClausulaDocumento[],
+  conteudo: string,
   opts: { letterheadDataUrl?: string | null; cabecalho?: CabecalhoDocumento }
 ): string {
-  const doc = criarDocumentoPDF(clausulas, opts);
+  const doc = criarDocumentoPDF(conteudo, opts);
   const dataUri = doc.output("datauristring");
   return dataUri.slice(dataUri.indexOf(",") + 1);
 }
@@ -358,30 +347,20 @@ function tableFromBlock(block: TableBlock): Table {
 }
 
 export async function exportContratoDocx(
-  clausulas: ClausulaDocumento[],
+  conteudo: string,
   opts: { numeroContrato?: string | null; letterheadDataUrl?: string | null; cabecalho?: CabecalhoDocumento }
 ) {
-  downloadBlob(await gerarContratoDocxBlob(clausulas, opts), nomeArquivo(opts.numeroContrato, "docx"));
+  downloadBlob(await gerarContratoDocxBlob(conteudo, opts), nomeArquivo(opts.numeroContrato, "docx"));
 }
 
 export async function gerarContratoDocxBlob(
-  clausulas: ClausulaDocumento[],
+  conteudo: string,
   opts: { letterheadDataUrl?: string | null; cabecalho?: CabecalhoDocumento }
 ) {
   const children: (Paragraph | Table)[] = [];
 
-  for (const clausula of clausulas) {
-    if (clausula.titulo) {
-      children.push(
-        new Paragraph({
-          children: [new DocxTextRun({ text: clausula.titulo, bold: true })],
-          spacing: { before: 200, after: 100, ...LINE_1_5 },
-        })
-      );
-    }
-    for (const block of parseClauseHtml(clausula.texto)) {
-      children.push(block.type === "table" ? tableFromBlock(block) : paragraphFromBlock(block));
-    }
+  for (const block of parseClauseHtml(conteudo)) {
+    children.push(block.type === "table" ? tableFromBlock(block) : paragraphFromBlock(block));
   }
 
   const headerChildren: Paragraph[] = [];

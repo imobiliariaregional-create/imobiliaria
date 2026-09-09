@@ -1,12 +1,11 @@
-import type { ClausulaDocumento } from "@/lib/types";
 import { sanitizeClauseHtml, ensureClauseHtml } from "@/lib/richText";
 import { linhasCabecalho, tituloDocumento, type CabecalhoDocumento } from "@/lib/contratoDocumento";
 
 export function DocumentoContratoView({
-  clausulas,
+  conteudo,
   cabecalho,
 }: {
-  clausulas: ClausulaDocumento[];
+  conteudo: string;
   cabecalho?: CabecalhoDocumento;
 }) {
   return (
@@ -21,15 +20,10 @@ export function DocumentoContratoView({
           <p className="text-center font-bold">{tituloDocumento(cabecalho.tipoOperacao)}</p>
         </div>
       )}
-      {clausulas.map((clausula) => (
-        <div key={clausula.id}>
-          {clausula.titulo && <p className="font-semibold mb-1">{clausula.titulo}</p>}
-          <div
-            className="clause-rich-content"
-            dangerouslySetInnerHTML={{ __html: sanitizeClauseHtml(ensureClauseHtml(clausula.texto)) }}
-          />
-        </div>
-      ))}
+      <div
+        className="clause-rich-content"
+        dangerouslySetInnerHTML={{ __html: sanitizeClauseHtml(ensureClauseHtml(conteudo)) }}
+      />
     </div>
   );
 }

@@ -165,17 +165,11 @@ export interface NotaFiscal {
   contratos?: Contrato | null;
 }
 
-export interface ClausulaDocumento {
-  id: string;
-  titulo: string | null;
-  texto: string;
-}
-
 export interface ModeloContrato {
   id: string;
   nome: string;
   tipo_operacao: TipoOperacao;
-  clausulas: ClausulaDocumento[];
+  conteudo: string;
   created_at: string;
 }
 
@@ -185,7 +179,7 @@ export interface ContratoGerado {
   id: string;
   contrato_id: string;
   modelo_id: string | null;
-  clausulas: ClausulaDocumento[];
+  conteudo: string;
   created_at: string;
   origem: OrigemContratoGerado;
   arquivo_importado_drive_file_id: string | null;

@@ -41,7 +41,7 @@ export function ModelosContratoListPage() {
     try {
       const { data: novo, error } = await supabase
         .from("modelos_contrato")
-        .insert({ nome: `${modelo.nome} (cópia)`, tipo_operacao: modelo.tipo_operacao, clausulas: modelo.clausulas })
+        .insert({ nome: `${modelo.nome} (cópia)`, tipo_operacao: modelo.tipo_operacao, conteudo: modelo.conteudo })
         .select("*")
         .single<ModeloContrato>();
       if (error) throw new Error(error.message);
@@ -67,7 +67,6 @@ export function ModelosContratoListPage() {
               <tr>
                 <Th>Nome</Th>
                 <Th>Tipo</Th>
-                <Th>Cláusulas</Th>
                 {podeEditar && <Th>&nbsp;</Th>}
               </tr>
             </thead>
@@ -82,7 +81,6 @@ export function ModelosContratoListPage() {
                   <Td>
                     <Badge color="blue">{tipoLabel[modelo.tipo_operacao]}</Badge>
                   </Td>
-                  <Td>{modelo.clausulas.length}</Td>
                   {podeEditar && (
                     <Td className="text-right">
                       <Button type="button" variant="secondary" onClick={() => duplicar(modelo)} disabled={duplicandoId === modelo.id}>

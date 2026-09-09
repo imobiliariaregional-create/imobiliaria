@@ -1,8 +1,8 @@
 import { FormEvent, useState } from "react";
 import { Card, Field, Input, Select, Button, ErrorState } from "@/components/ui";
-import { ClausulasEditor } from "@/components/ClausulasEditor";
+import { RichTextEditor } from "@/components/RichTextEditor";
 import { PLACEHOLDERS } from "@/lib/placeholders";
-import type { ClausulaDocumento, ModeloContrato } from "@/lib/types";
+import type { ModeloContrato } from "@/lib/types";
 import { upper, useFormDraft } from "@/lib/forms";
 
 export type ModeloContratoPayload = Omit<ModeloContrato, "id" | "created_at">;
@@ -17,19 +17,15 @@ export function ModeloContratoForm({
   defaultValues?: Partial<ModeloContrato>;
 }) {
   const draftId = `modelo:${defaultValues?.id ?? "novo"}`;
-  const clausulasKey = `imobiliaria:rascunho:${draftId}:clausulas`;
-  const [clausulas, setClausulas] = useState<ClausulaDocumento[]>(() => {
-    const saved = sessionStorage.getItem(clausulasKey);
-    if (!saved) return defaultValues?.clausulas ?? [];
-    try { return JSON.parse(saved) as ClausulaDocumento[]; } catch { return defaultValues?.clausulas ?? []; }
-  });
+  const conteudoKey = `imobiliaria:rascunho:${draftId}:conteudo`;
+  const [conteudo, setConteudo] = useState(() => sessionStorage.getItem(conteudoKey) ?? defaultValues?.conteudo ?? "");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { formRef, saveDraft, clearDraft } = useFormDraft(draftId);
 
-  function handleClausulasChange(next: ClausulaDocumento[]) {
-    setClausulas(next);
-    sessionStorage.setItem(clausulasKey, JSON.stringify(next));
+  function handleConteudoChange(next: string) {
+    setConteudo(next);
+    sessionStorage.setItem(conteudoKey, next);
   }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -41,10 +37,10 @@ export function ModeloContratoForm({
       await onSubmit({
         nome: upper(formData.get("nome")),
         tipo_operacao: String(formData.get("tipo_operacao") ?? "aluguel") as ModeloContrato["tipo_operacao"],
-        clausulas,
+        conteudo,
       });
       clearDraft();
-      sessionStorage.removeItem(clausulasKey);
+      sessionStorage.removeItem(conteudoKey);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao salvar.");
     } finally {
@@ -68,8 +64,12 @@ export function ModeloContratoForm({
           </Field>
 
           <div>
-            <p className="text-sm font-medium text-slate-700 mb-2">Cláusulas do modelo</p>
-            <ClausulasEditor clausulas={clausulas} onChange={handleClausulasChange} />
+            <p className="text-sm font-medium text-slate-700 mb-2">Conteúdo do modelo</p>
+            <RichTextEditor
+              value={conteudo}
+              onChange={handleConteudoChange}
+              placeholder="Digite o contrato aqui, do jeito que ficaria no Word. Use códigos como #nome_locador para preencher automaticamente."
+            />
           </div>
 
           {error && <ErrorState message={error} />}
@@ -80,7 +80,7 @@ export function ModeloContratoForm({
       <Card className="p-6 h-fit sticky top-4">
         <p className="text-sm font-medium text-slate-900 mb-3">Códigos disponíveis</p>
         <p className="text-xs text-slate-500 mb-4">
-          Copie e cole os códigos abaixo dentro do texto das cláusulas. Eles serão substituídos automaticamente pelos dados reais na hora de gerar o contrato.
+          Copie e cole os códigos abaixo dentro do texto do modelo. Eles serão substituídos automaticamente pelos dados reais na hora de gerar o contrato.
         </p>
         <div className="space-y-4 max-h-[70vh] overflow-y-auto">
           {categorias.map((categoria) => (
