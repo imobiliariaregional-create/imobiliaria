@@ -217,13 +217,17 @@ function criarDocumentoPDF(
 
   let y = drawPageChrome();
   const topoConteudoPadrao = y;
-  let topoUltimaPagina = topoConteudoPadrao;
+  // Conta linhas com TEXTO DE VERDADE na ultima pagina (nao so o quanto o "y" avancou) — um
+  // paragrafo em branco (comum antes/entre blocos de assinatura) nao deve contar como
+  // "conteudo", senao uma pagina quase vazia mas com bastante espaco em branco passaria
+  // despercebida como se estivesse cheia.
+  let linhasReaisUltimaPagina = 0;
 
   function ensureSpace(neededHeight: number) {
     if (y + neededHeight > pageHeight - marginBottom) {
       doc.addPage();
       y = drawPageChrome();
-      topoUltimaPagina = y;
+      linhasReaisUltimaPagina = 0;
     }
   }
 
@@ -241,6 +245,7 @@ function criarDocumentoPDF(
       ensureSpace(lineHeight);
       desenharLinhaComEstilo(doc, linha, marginLeft, y, contentWidth, block.align, idx === linhas.length - 1);
       y += lineHeight;
+      linhasReaisUltimaPagina++;
     });
     doc.setFont("helvetica", "normal");
   }
@@ -258,8 +263,9 @@ function criarDocumentoPDF(
         // redesenhar na página atual apagaria (por cima) o conteúdo que já tinha sido escrito ali.
         const paginasAgora = doc.getNumberOfPages();
         if (paginasAgora > paginasAntes) {
-          topoUltimaPagina = drawPageChrome();
+          drawPageChrome();
           paginasAntes = paginasAgora;
+          linhasReaisUltimaPagina = 0;
         }
       },
       didParseCell: (data) => {
@@ -279,6 +285,8 @@ function criarDocumentoPDF(
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     y = (doc as any).lastAutoTable.finalY + lineHeight * 0.6;
+    // Tabela conta como conteudo "de verdade" (nao e espaco em branco) — soma as linhas dela.
+    linhasReaisUltimaPagina += block.rows.length;
   }
 
   const blocks: ContentBlock[] = parseClauseHtml(conteudo);
@@ -287,8 +295,7 @@ function criarDocumentoPDF(
     else desenharParagrafo(block);
   }
 
-  const linhasUltimaPagina = Math.max(0, Math.round((y - topoUltimaPagina) / lineHeight));
-  return { doc, paginas: doc.getNumberOfPages(), linhasUltimaPagina };
+  return { doc, paginas: doc.getNumberOfPages(), linhasUltimaPagina: linhasReaisUltimaPagina };
 }
 
 /**
