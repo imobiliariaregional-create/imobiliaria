@@ -57,6 +57,30 @@ const MARGIN_LEFT_TWIP = Math.round(MARGIN_LEFT_MM / MM_PER_TWIP);
 const MARGIN_BOTTOM_TWIP = Math.round(MARGIN_BOTTOM_MM / MM_PER_TWIP);
 const MARGIN_RIGHT_TWIP = Math.round(MARGIN_RIGHT_MM / MM_PER_TWIP);
 
+/**
+ * Niveis de ajuste para evitar que uma sobra pequena de conteudo (tipicamente as
+ * assinaturas) fique orfa sozinha na ultima pagina. Cada nivel aperta um pouco mais
+ * o espacamento/margens antes de mexer no tamanho da fonte.
+ */
+interface NivelAjustePdf {
+  fonte: number;
+  espacamento: number;
+  margemTopo: number;
+  margemBaixo: number;
+  margemEsquerda: number;
+  margemDireita: number;
+}
+
+const NIVEIS_AJUSTE_PDF: NivelAjustePdf[] = [
+  { fonte: 10, espacamento: 1.5, margemTopo: 30, margemBaixo: 20, margemEsquerda: 30, margemDireita: 20 },
+  { fonte: 10, espacamento: 1.35, margemTopo: 27, margemBaixo: 18, margemEsquerda: 27, margemDireita: 18 },
+  { fonte: 9.5, espacamento: 1.25, margemTopo: 24, margemBaixo: 16, margemEsquerda: 24, margemDireita: 16 },
+  { fonte: 9, espacamento: 1.15, margemTopo: 20, margemBaixo: 14, margemEsquerda: 20, margemDireita: 14 },
+];
+
+/** Quantas linhas de sobra na ultima pagina ainda contam como "orfa" (poucas linhas isoladas). */
+const LIMITE_LINHAS_ORFA = 6;
+
 function nomeArquivo(numeroContrato: string | null | undefined, extensao: string) {
   const base = numeroContrato ? `contrato-${numeroContrato.replace("/", "-")}` : "contrato";
   return `${base}.${extensao}`;
@@ -145,29 +169,42 @@ function desenharLinhaComEstilo(doc: jsPDF, linha: Word[], x: number, y: number,
   doc.setTextColor(...COR_TEXTO_PADRAO);
 }
 
+interface ResultadoLayoutPdf {
+  doc: jsPDF;
+  paginas: number;
+  linhasUltimaPagina: number;
+}
+
 function criarDocumentoPDF(
   conteudo: string,
-  opts: { letterheadDataUrl?: string | null; cabecalho?: CabecalhoDocumento }
-): jsPDF {
+  opts: { letterheadDataUrl?: string | null; cabecalho?: CabecalhoDocumento },
+  nivel = 0
+): ResultadoLayoutPdf {
+  const ajuste = NIVEIS_AJUSTE_PDF[nivel];
+  const marginTop = ajuste.margemTopo;
+  const marginLeft = ajuste.margemEsquerda;
+  const marginBottom = ajuste.margemBaixo;
+  const marginRight = ajuste.margemDireita;
+
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const contentWidth = pageWidth - MARGIN_LEFT_MM - MARGIN_RIGHT_MM;
-  const fontSize = 10; // pt
-  const lineHeight = fontSize * 0.3528 * 1.5; // espaçamento 1,5
+  const contentWidth = pageWidth - marginLeft - marginRight;
+  const fontSize = ajuste.fonte; // pt
+  const lineHeight = fontSize * 0.3528 * ajuste.espacamento;
 
-  /** Desenha o papel timbrado e o cabecalho (numero/data/tipo + titulo) — repetido em toda pagina, como um cabecalho de verdade. */
+  /** Desenha o papel timbrado e o cabecalho (numero/data/tipo) — repetido em toda pagina, como um cabecalho de verdade. */
   function drawPageChrome(): number {
     if (opts.letterheadDataUrl) {
       doc.addImage(opts.letterheadDataUrl, "PNG", 0, 0, pageWidth, pageHeight);
     }
-    let topoConteudo = MARGIN_TOP_MM;
+    let topoConteudo = marginTop;
     if (opts.cabecalho) {
-      let yCabecalho = MARGIN_TOP_MM;
+      let yCabecalho = marginTop;
       doc.setFontSize(9);
       doc.setFont("helvetica", "normal");
       for (const linha of linhasCabecalho(opts.cabecalho)) {
-        doc.text(linha, pageWidth - MARGIN_RIGHT_MM, yCabecalho, { align: "right" });
+        doc.text(linha, pageWidth - marginRight, yCabecalho, { align: "right" });
         yCabecalho += lineHeight * 0.85;
       }
       yCabecalho += lineHeight * 0.5;
@@ -180,11 +217,13 @@ function criarDocumentoPDF(
 
   let y = drawPageChrome();
   const topoConteudoPadrao = y;
+  let topoUltimaPagina = topoConteudoPadrao;
 
   function ensureSpace(neededHeight: number) {
-    if (y + neededHeight > pageHeight - MARGIN_BOTTOM_MM) {
+    if (y + neededHeight > pageHeight - marginBottom) {
       doc.addPage();
       y = drawPageChrome();
+      topoUltimaPagina = y;
     }
   }
 
@@ -200,7 +239,7 @@ function criarDocumentoPDF(
     const linhas = quebrarEmLinhas(doc, palavras, contentWidth);
     linhas.forEach((linha, idx) => {
       ensureSpace(lineHeight);
-      desenharLinhaComEstilo(doc, linha, MARGIN_LEFT_MM, y, contentWidth, block.align, idx === linhas.length - 1);
+      desenharLinhaComEstilo(doc, linha, marginLeft, y, contentWidth, block.align, idx === linhas.length - 1);
       y += lineHeight;
     });
     doc.setFont("helvetica", "normal");
@@ -210,7 +249,7 @@ function criarDocumentoPDF(
     let paginasAntes = doc.getNumberOfPages();
     autoTable(doc, {
       startY: y,
-      margin: { left: MARGIN_LEFT_MM, right: MARGIN_RIGHT_MM, bottom: MARGIN_BOTTOM_MM, top: topoConteudoPadrao },
+      margin: { left: marginLeft, right: marginRight, bottom: marginBottom, top: topoConteudoPadrao },
       body: block.rows.map((row) => row.map((celula) => runsToPlainText(celula.runs))),
       theme: "grid",
       styles: { fontSize: 9, cellPadding: 2, lineColor: [148, 163, 184], lineWidth: 0.2, textColor: COR_TEXTO_PADRAO },
@@ -219,7 +258,7 @@ function criarDocumentoPDF(
         // redesenhar na página atual apagaria (por cima) o conteúdo que já tinha sido escrito ali.
         const paginasAgora = doc.getNumberOfPages();
         if (paginasAgora > paginasAntes) {
-          drawPageChrome();
+          topoUltimaPagina = drawPageChrome();
           paginasAntes = paginasAgora;
         }
       },
@@ -248,7 +287,28 @@ function criarDocumentoPDF(
     else desenharParagrafo(block);
   }
 
-  return doc;
+  const linhasUltimaPagina = Math.max(0, Math.round((y - topoUltimaPagina) / lineHeight));
+  return { doc, paginas: doc.getNumberOfPages(), linhasUltimaPagina };
+}
+
+/**
+ * Gera o PDF tentando evitar que sobre pouca coisa (tipicamente as assinaturas) sozinha
+ * numa ultima pagina: se a primeira tentativa deixar uma "sobra orfa", tenta de novo com
+ * espacamento/margens (e por ultimo fonte) um pouco menores, ate caber ou esgotar os niveis.
+ */
+function gerarPdfComAjusteDeOrfa(
+  conteudo: string,
+  opts: { letterheadDataUrl?: string | null; cabecalho?: CabecalhoDocumento }
+): jsPDF {
+  const tentativas: ResultadoLayoutPdf[] = [];
+  for (let nivel = 0; nivel < NIVEIS_AJUSTE_PDF.length; nivel++) {
+    const resultado = criarDocumentoPDF(conteudo, opts, nivel);
+    if (resultado.paginas <= 1 || resultado.linhasUltimaPagina > LIMITE_LINHAS_ORFA) return resultado.doc;
+    tentativas.push(resultado);
+  }
+  // Nenhum nivel resolveu de vez: fica com quem tiver menos paginas e, empatando, mais linhas na ultima.
+  tentativas.sort((a, b) => a.paginas - b.paginas || b.linhasUltimaPagina - a.linhasUltimaPagina);
+  return tentativas[0].doc;
 }
 
 export function exportContratoPDF(
@@ -262,7 +322,7 @@ export function gerarContratoPdfBlob(
   conteudo: string,
   opts: { letterheadDataUrl?: string | null; cabecalho?: CabecalhoDocumento }
 ): Blob {
-  return criarDocumentoPDF(conteudo, opts).output("blob");
+  return gerarPdfComAjusteDeOrfa(conteudo, opts).output("blob");
 }
 
 /** Gera o mesmo PDF em base64 (sem disparar download) — usado para enviar para assinatura digital. */
@@ -270,7 +330,7 @@ export function gerarContratoPdfBase64(
   conteudo: string,
   opts: { letterheadDataUrl?: string | null; cabecalho?: CabecalhoDocumento }
 ): string {
-  const doc = criarDocumentoPDF(conteudo, opts);
+  const doc = gerarPdfComAjusteDeOrfa(conteudo, opts);
   const dataUri = doc.output("datauristring");
   return dataUri.slice(dataUri.indexOf(",") + 1);
 }
@@ -322,13 +382,18 @@ function runsToDocxRuns(runs: TextRun[]): DocxTextRun[] {
   return out;
 }
 
-function paragraphFromBlock(block: ParagraphBlock): Paragraph {
+function paragraphFromBlock(block: ParagraphBlock, opcoes?: { keepNext?: boolean; keepLines?: boolean }): Paragraph {
   return new Paragraph({
     alignment: mapAlignDocx(block.align),
     children: runsToDocxRuns(block.runs),
     spacing: { after: 100, ...LINE_1_5 },
+    keepNext: opcoes?.keepNext,
+    keepLines: opcoes?.keepLines,
   });
 }
+
+/** Quantos parágrafos finais tratar como um bloco só (tipicamente onde ficam as assinaturas), pra evitar que o Word os separe de forma feia entre páginas. */
+const PARAGRAFOS_FINAIS_UNIDOS = 4;
 
 function tableFromBlock(block: TableBlock): Table {
   return new Table({
@@ -362,9 +427,22 @@ export async function gerarContratoDocxBlob(
 ) {
   const children: (Paragraph | Table)[] = [];
 
-  for (const block of parseClauseHtml(conteudo)) {
-    children.push(block.type === "table" ? tableFromBlock(block) : paragraphFromBlock(block));
-  }
+  const blocks = parseClauseHtml(conteudo);
+  const indicesParagrafo = blocks.map((b, i) => (b.type === "paragraph" ? i : -1)).filter((i) => i >= 0);
+  const indicesFinais = new Set(indicesParagrafo.slice(-PARAGRAFOS_FINAIS_UNIDOS));
+  const ultimoIndiceParagrafo = indicesParagrafo[indicesParagrafo.length - 1];
+
+  blocks.forEach((block, i) => {
+    if (block.type === "table") {
+      children.push(tableFromBlock(block));
+      return;
+    }
+    // Os ultimos paragrafos (normalmente onde ficam as assinaturas) sao marcados pra ficarem
+    // juntos: "keepLines" evita quebrar um deles ao meio, e "keepNext" gruda cada um ao
+    // seguinte, entao o Word so quebra a pagina antes desse bloco inteiro, nunca no meio dele.
+    const noBlocoFinal = indicesFinais.has(i);
+    children.push(paragraphFromBlock(block, { keepLines: noBlocoFinal, keepNext: noBlocoFinal && i !== ultimoIndiceParagrafo }));
+  });
 
   const headerChildren: Paragraph[] = [];
   if (opts.letterheadDataUrl) {
