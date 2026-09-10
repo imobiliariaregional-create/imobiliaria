@@ -124,6 +124,9 @@ export interface PagamentoMensal {
   asaas_boleto_url: string | null;
   asaas_linha_digitavel: string | null;
   asaas_split_ativo: boolean;
+  asaas_transfer_id: string | null;
+  asaas_transfer_status: string | null;
+  asaas_transfer_erro: string | null;
   created_at: string;
   contratos?: Contrato | null;
 }

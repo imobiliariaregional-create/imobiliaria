@@ -40,6 +40,11 @@ export function consultarStatusBoleto(chargeId: string): Promise<PagamentoMensal
   return invocar<PagamentoMensal>({ action: "consultarStatus", chargeId });
 }
 
+/** Manda o valor que ficou na subconta do proprietário para a conta bancária dele. */
+export function transferirRepasse(pagamentoId: string): Promise<{ transferId?: string; status?: string }> {
+  return invocar({ action: "transferirRepasse", pagamentoId });
+}
+
 /** Cria a subconta Asaas do proprietário (necessária para o split automático). */
 export function criarSubconta(proprietarioId: string, dados: DadosSubconta): Promise<{ walletId: string; jaExistia: boolean }> {
   return invocar({ action: "criarSubconta", proprietarioId, ...dados });

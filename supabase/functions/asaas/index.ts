@@ -48,8 +48,9 @@ async function exigirUsuarioAutenticado(req: Request) {
   if (!response.ok) throw new HttpError("Sessão inválida ou expirada.", 401);
 }
 
-async function asaasFetch(path: string, init: RequestInit = {}) {
-  const apiKey = Deno.env.get("ASAAS_API_KEY");
+/** chaveAlternativa: usada para operar dentro da subconta do proprietário (a chave principal não move o saldo dela). */
+async function asaasFetch(path: string, init: RequestInit = {}, chaveAlternativa?: string) {
+  const apiKey = chaveAlternativa ?? Deno.env.get("ASAAS_API_KEY");
   const baseUrl = Deno.env.get("ASAAS_BASE_URL");
   if (!apiKey || !baseUrl) throw new Error("ASAAS_API_KEY/ASAAS_BASE_URL não configuradas nos secrets da function.");
   const res = await fetch(`${baseUrl}${path}`, {
@@ -243,7 +244,89 @@ async function criarSubconta(dados: DadosCriarSubconta) {
     method: "PATCH",
     body: JSON.stringify({ asaas_wallet_id: conta.walletId }),
   });
+
+  // A chave da subconta só vem nessa resposta e não é recuperável depois. Sem
+  // ela, não dá para transferir o saldo do proprietário para o banco dele.
+  const chaveSubconta = conta.apiKey ?? conta.accessToken;
+  if (chaveSubconta) {
+    await supabaseRest("/credenciais_asaas", {
+      method: "POST",
+      body: JSON.stringify({ proprietario_id: dados.proprietarioId, api_key: chaveSubconta }),
+    });
+  }
+
   return { walletId: conta.walletId, jaExistia: false };
+}
+
+const TIPO_CHAVE_PIX_ASAAS: Record<string, string> = {
+  cpf: "CPF",
+  cnpj: "CNPJ",
+  telefone: "PHONE",
+  email: "EMAIL",
+  aleatoria: "EVP",
+};
+
+async function registrarTransferencia(pagamentoId: string, patch: Record<string, unknown>) {
+  await supabaseRest(`/pagamentos_mensais?id=eq.${pagamentoId}`, { method: "PATCH", body: JSON.stringify(patch) });
+}
+
+/**
+ * Manda o dinheiro que o split deixou na subconta do proprietário para a conta
+ * bancária dele, via Pix. Nunca lança: o chamador (webhook) precisa seguir.
+ */
+async function transferirParaProprietario(pagamentoId: string) {
+  const [pagamento] = await supabaseRest(
+    `/pagamentos_mensais?id=eq.${pagamentoId}&select=*,contratos(imoveis(proprietarios(*)))`
+  );
+  if (!pagamento) return { ok: false, erro: "Pagamento não encontrado." };
+  if (pagamento.asaas_transfer_id) return { ok: true, jaTransferido: true };
+
+  const proprietario = pagamento.contratos?.imoveis?.proprietarios;
+  if (!proprietario) return { ok: false, erro: "Imóvel sem proprietário vinculado." };
+
+  const [credencial] = await supabaseRest(`/credenciais_asaas?proprietario_id=eq.${proprietario.id}&select=api_key`);
+  if (!credencial?.api_key) {
+    await registrarTransferencia(pagamentoId, {
+      asaas_transfer_status: "sem_credencial",
+      asaas_transfer_erro: "Subconta criada sem chave de API guardada — o saque precisa ser feito pelo proprietário.",
+    });
+    return { ok: false, erro: "Sem credencial da subconta." };
+  }
+
+  const tipoChave = TIPO_CHAVE_PIX_ASAAS[proprietario.tipo_chave_pix ?? ""];
+  if (!proprietario.chave_pix || !tipoChave) {
+    const erro = "Cadastre a chave PIX do proprietário para transferir automaticamente.";
+    await registrarTransferencia(pagamentoId, { asaas_transfer_status: "falhou", asaas_transfer_erro: erro });
+    return { ok: false, erro };
+  }
+
+  const valor = Number(pagamento.valor_bruto) - Number(pagamento.valor);
+  try {
+    const transferencia = await asaasFetch(
+      "/transfers",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          value: Number(valor.toFixed(2)),
+          pixAddressKey: proprietario.chave_pix,
+          pixAddressKeyType: tipoChave,
+          description: `Repasse de aluguel ${pagamento.mes_referencia?.slice(0, 7) ?? ""}`,
+          externalReference: pagamentoId,
+        }),
+      },
+      credencial.api_key
+    );
+    await registrarTransferencia(pagamentoId, {
+      asaas_transfer_id: transferencia.id,
+      asaas_transfer_status: transferencia.status,
+      asaas_transfer_erro: null,
+    });
+    return { ok: true, transferId: transferencia.id, status: transferencia.status };
+  } catch (err) {
+    const erro = err instanceof Error ? err.message : "Erro ao transferir.";
+    await registrarTransferencia(pagamentoId, { asaas_transfer_status: "falhou", asaas_transfer_erro: erro });
+    return { ok: false, erro };
+  }
 }
 
 async function consultarStatus(chargeId: string) {
@@ -268,6 +351,7 @@ async function receberWebhook(req: Request) {
   if (!cobranca?.id) return jsonResponse({ ok: true });
 
   const patch: Record<string, unknown> = { asaas_status: cobranca.status };
+  let pagamentoParaTransferir: string | null = null;
   if (evento && EVENTOS_PAGO.has(evento)) {
     patch.status = "pago";
     patch.data_pagamento = cobranca.paymentDate ?? cobranca.clientPaymentDate ?? new Date().toISOString().slice(0, 10);
@@ -275,16 +359,24 @@ async function receberWebhook(req: Request) {
     // Recebimento em dinheiro nao passa pelo Asaas, entao o split nao executa e o
     // repasse ao proprietario continua sendo manual.
     const splitExecutou = cobranca.status !== "RECEIVED_IN_CASH";
-    const [pagamentoAtual] = await supabaseRest(`/pagamentos_mensais?asaas_charge_id=eq.${cobranca.id}&select=asaas_split_ativo,valor_repassado,valor_bruto,valor`);
+    const [pagamentoAtual] = await supabaseRest(`/pagamentos_mensais?asaas_charge_id=eq.${cobranca.id}&select=id,asaas_split_ativo,valor_repassado,valor_bruto,valor`);
     if (splitExecutou && pagamentoAtual?.asaas_split_ativo && pagamentoAtual.valor_repassado === null) {
       patch.valor_repassado = Number(pagamentoAtual.valor_bruto) - Number(pagamentoAtual.valor);
       patch.data_repasse = patch.data_pagamento;
+    }
+
+    // Só no PAYMENT_RECEIVED: no PAYMENT_CONFIRMED o boleto ainda não compensou
+    // e a subconta do proprietário não teria saldo para transferir.
+    if (splitExecutou && evento === "PAYMENT_RECEIVED" && pagamentoAtual?.asaas_split_ativo) {
+      pagamentoParaTransferir = pagamentoAtual.id as string;
     }
   }
   await supabaseRest(`/pagamentos_mensais?asaas_charge_id=eq.${cobranca.id}`, {
     method: "PATCH",
     body: JSON.stringify(patch),
   });
+
+  if (pagamentoParaTransferir) await transferirParaProprietario(pagamentoParaTransferir);
   return jsonResponse({ ok: true });
 }
 
@@ -309,6 +401,11 @@ Deno.serve(async (req) => {
     }
     if (action === "criarSubconta") {
       return jsonResponse(await criarSubconta(payload as DadosCriarSubconta));
+    }
+    if (action === "transferirRepasse") {
+      const resultado = await transferirParaProprietario(payload.pagamentoId);
+      if (!resultado.ok) throw new HttpError(resultado.erro ?? "Erro ao transferir.", 400);
+      return jsonResponse(resultado);
     }
     return jsonResponse({ error: "Ação inválida." }, 400);
   } catch (err) {

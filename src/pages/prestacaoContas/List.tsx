@@ -7,6 +7,18 @@ import type { Proprietario, PagamentoMensal } from "@/lib/types";
 import { useAuth } from "@/lib/auth";
 import { normalizeSearch } from "@/lib/forms";
 import { enderecoImovel } from "@/lib/imovelLabel";
+import { transferirRepasse } from "@/lib/asaas";
+
+/** Status vindos do Asaas mais os que a própria function grava quando nem chega a tentar. */
+const TRANSFER_LABEL: Record<string, string> = {
+  PENDING: "transferência a caminho do banco",
+  BANK_PROCESSING: "transferência a caminho do banco",
+  DONE: "depositado no banco do proprietário",
+  FAILED: "transferência falhou",
+  CANCELLED: "transferência cancelada",
+  falhou: "transferência falhou",
+  sem_credencial: "saque manual (subconta sem chave guardada)",
+};
 
 function mesAtualISO() {
   return todayISO().slice(0, 7);
@@ -20,6 +32,7 @@ export function PrestacaoContasListPage() {
   const [linhas, setLinhas] = useState<PagamentoMensal[] | null>(null);
   const [search, setSearch] = useState("");
   const [tipo, setTipo] = useState("");
+  const [transferindoId, setTransferindoId] = useState<string | null>(null);
   const filtered = useMemo(() => (linhas ?? []).filter((item) => {
     const repassado = item.valor_repassado !== null ? "repassado" : "pendente";
     const haystack = normalizeSearch([item.contratos?.pessoas?.nome, item.contratos?.imoveis ? enderecoImovel(item.contratos.imoveis) : "", repassado].join(" "));
@@ -63,6 +76,18 @@ export function PrestacaoContasListPage() {
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proprietarioId, mes]);
+
+  async function handleTransferir(p: PagamentoMensal) {
+    setTransferindoId(p.id);
+    try {
+      await transferirRepasse(p.id);
+      await reload();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao transferir.");
+    } finally {
+      setTransferindoId(null);
+    }
+  }
 
   async function marcarRepassado(p: PagamentoMensal, liquido: number) {
     const jaRepassado = p.valor_repassado !== null;
@@ -171,6 +196,24 @@ export function PrestacaoContasListPage() {
                           </Badge>
                         ) : (
                           <Badge color="yellow">pendente</Badge>
+                        )}
+                        {p.asaas_split_ativo && (
+                          <div className="mt-1 flex flex-col gap-1 text-xs">
+                            <span className={p.asaas_transfer_status === "DONE" ? "text-slate-600" : "text-slate-500"}>
+                              {TRANSFER_LABEL[p.asaas_transfer_status ?? ""] ?? "aguardando transferência"}
+                            </span>
+                            {p.asaas_transfer_erro && <span className="text-red-600">{p.asaas_transfer_erro}</span>}
+                            {p.asaas_transfer_status !== "DONE" && (papel === "admin" || papel === "financeiro") && (
+                              <button
+                                type="button"
+                                className="self-start text-brand-700 hover:underline"
+                                disabled={transferindoId === p.id}
+                                onClick={() => handleTransferir(p)}
+                              >
+                                {transferindoId === p.id ? "Transferindo..." : "Transferir agora"}
+                              </button>
+                            )}
+                          </div>
                         )}
                       </Td>
                       <Td>
