@@ -272,8 +272,11 @@ async function receberWebhook(req: Request) {
     patch.status = "pago";
     patch.data_pagamento = cobranca.paymentDate ?? cobranca.clientPaymentDate ?? new Date().toISOString().slice(0, 10);
 
+    // Recebimento em dinheiro nao passa pelo Asaas, entao o split nao executa e o
+    // repasse ao proprietario continua sendo manual.
+    const splitExecutou = cobranca.status !== "RECEIVED_IN_CASH";
     const [pagamentoAtual] = await supabaseRest(`/pagamentos_mensais?asaas_charge_id=eq.${cobranca.id}&select=asaas_split_ativo,valor_repassado,valor_bruto,valor`);
-    if (pagamentoAtual?.asaas_split_ativo && pagamentoAtual.valor_repassado === null) {
+    if (splitExecutou && pagamentoAtual?.asaas_split_ativo && pagamentoAtual.valor_repassado === null) {
       patch.valor_repassado = Number(pagamentoAtual.valor_bruto) - Number(pagamentoAtual.valor);
       patch.data_repasse = patch.data_pagamento;
     }
