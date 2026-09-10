@@ -7,7 +7,7 @@ import { consultarCNPJ } from "@/lib/cnpj";
 import { PhoneInput } from "@/components/PhoneInput";
 import { PixInput } from "@/components/PixInput";
 
-export type ProprietarioPayload = Omit<Proprietario, "id" | "created_at">;
+export type ProprietarioPayload = Omit<Proprietario, "id" | "created_at" | "asaas_wallet_id">;
 
 export function ProprietarioForm({
   onSubmit,

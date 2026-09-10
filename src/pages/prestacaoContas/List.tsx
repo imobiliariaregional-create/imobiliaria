@@ -165,7 +165,10 @@ export function PrestacaoContasListPage() {
                       <Td className="font-medium">{formatBRL(liquido)}</Td>
                       <Td>
                         {repassado ? (
-                          <Badge color="green">repassado em {p.data_repasse?.split("-").reverse().join("/")}</Badge>
+                          <Badge color="green">
+                            {p.asaas_split_ativo ? "repassado automaticamente (Asaas) em " : "repassado em "}
+                            {p.data_repasse?.split("-").reverse().join("/")}
+                          </Badge>
                         ) : (
                           <Badge color="yellow">pendente</Badge>
                         )}

@@ -115,7 +115,7 @@ interface DadosGerarBoleto {
 
 async function gerarBoleto({ pagamentoId }: DadosGerarBoleto) {
   const [pagamento] = await supabaseRest(
-    `/pagamentos_mensais?id=eq.${pagamentoId}&select=*,contratos(*,pessoas(*))`
+    `/pagamentos_mensais?id=eq.${pagamentoId}&select=*,contratos(*,pessoas(*),imoveis(*,proprietarios(*)))`
   );
   if (!pagamento) throw new HttpError("Pagamento não encontrado.", 404);
   const contrato = pagamento.contratos;
@@ -132,6 +132,19 @@ async function gerarBoleto({ pagamentoId }: DadosGerarBoleto) {
   const valorCobranca = contrato.tipo === "administracao" ? pagamento.valor_bruto : pagamento.valor;
   const customerId = await obterOuCriarCliente(pessoa);
 
+  let splitAtivo = false;
+  let split: { walletId: string; fixedValue: number }[] | undefined;
+  if (contrato.tipo === "administracao") {
+    const walletId = contrato.imoveis?.proprietarios?.asaas_wallet_id as string | null | undefined;
+    if (walletId) {
+      const valorProprietario = Number(pagamento.valor_bruto) - Number(pagamento.valor);
+      if (valorProprietario > 0) {
+        split = [{ walletId, fixedValue: Number(valorProprietario.toFixed(2)) }];
+        splitAtivo = true;
+      }
+    }
+  }
+
   const cobranca = await asaasFetch("/payments", {
     method: "POST",
     body: JSON.stringify({
@@ -142,6 +155,7 @@ async function gerarBoleto({ pagamentoId }: DadosGerarBoleto) {
       description: `Aluguel referente a ${pagamento.mes_referencia?.slice(0, 7) ?? ""}`,
       fine: { value: 2, type: "PERCENTAGE" },
       interest: { value: 1 },
+      split,
     }),
   });
 
@@ -164,9 +178,72 @@ async function gerarBoleto({ pagamentoId }: DadosGerarBoleto) {
       asaas_status: cobranca.status,
       asaas_boleto_url: cobranca.bankSlipUrl ?? cobranca.invoiceUrl ?? null,
       asaas_linha_digitavel: linhaDigitavel,
+      asaas_split_ativo: splitAtivo,
     }),
   });
   return atualizado;
+}
+
+interface DadosCriarSubconta {
+  proprietarioId: string;
+  postalCode: string;
+  address: string;
+  addressNumber: string;
+  province: string;
+  incomeValue: number;
+  birthDate?: string;
+  companyType?: string;
+}
+
+const LIMITE_SUBCONTAS_AVALIACAO = 10;
+
+async function criarSubconta(dados: DadosCriarSubconta) {
+  const [proprietario] = await supabaseRest(`/proprietarios?id=eq.${dados.proprietarioId}&select=*`);
+  if (!proprietario) throw new HttpError("Proprietário não encontrado.", 404);
+  if (proprietario.asaas_wallet_id) {
+    return { walletId: proprietario.asaas_wallet_id, jaExistia: true };
+  }
+
+  if (!proprietario.nome || !proprietario.cpf_cnpj || !proprietario.email || !proprietario.telefone) {
+    throw new HttpError(
+      "Complete nome, CPF/CNPJ, e-mail e telefone do proprietário antes de criar a subconta.",
+      400
+    );
+  }
+
+  const existentes = await supabaseRest(`/proprietarios?asaas_wallet_id=not.is.null&select=id`);
+  if (Array.isArray(existentes) && existentes.length >= LIMITE_SUBCONTAS_AVALIACAO) {
+    throw new HttpError(
+      `Limite de ${LIMITE_SUBCONTAS_AVALIACAO} subcontas do período de avaliação do Asaas atingido. Aguarde a homologação para criar mais.`,
+      400
+    );
+  }
+
+  const corpo: Record<string, unknown> = {
+    name: proprietario.nome,
+    email: proprietario.email,
+    cpfCnpj: somenteDigitos(proprietario.cpf_cnpj),
+    mobilePhone: somenteDigitos(proprietario.telefone),
+    incomeValue: dados.incomeValue,
+    address: dados.address,
+    addressNumber: dados.addressNumber,
+    province: dados.province,
+    postalCode: somenteDigitos(dados.postalCode),
+  };
+  if (proprietario.tipo_pessoa === "fisica") {
+    if (!dados.birthDate) throw new HttpError("Data de nascimento é obrigatória para pessoa física.", 400);
+    corpo.birthDate = dados.birthDate;
+  } else {
+    if (!dados.companyType) throw new HttpError("Tipo de empresa é obrigatório para pessoa jurídica.", 400);
+    corpo.companyType = dados.companyType;
+  }
+
+  const conta = await asaasFetch("/accounts", { method: "POST", body: JSON.stringify(corpo) });
+  await supabaseRest(`/proprietarios?id=eq.${dados.proprietarioId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ asaas_wallet_id: conta.walletId }),
+  });
+  return { walletId: conta.walletId, jaExistia: false };
 }
 
 async function consultarStatus(chargeId: string) {
@@ -194,6 +271,12 @@ async function receberWebhook(req: Request) {
   if (evento && EVENTOS_PAGO.has(evento)) {
     patch.status = "pago";
     patch.data_pagamento = cobranca.paymentDate ?? cobranca.clientPaymentDate ?? new Date().toISOString().slice(0, 10);
+
+    const [pagamentoAtual] = await supabaseRest(`/pagamentos_mensais?asaas_charge_id=eq.${cobranca.id}&select=asaas_split_ativo,valor_repassado,valor_bruto,valor`);
+    if (pagamentoAtual?.asaas_split_ativo && pagamentoAtual.valor_repassado === null) {
+      patch.valor_repassado = Number(pagamentoAtual.valor_bruto) - Number(pagamentoAtual.valor);
+      patch.data_repasse = patch.data_pagamento;
+    }
   }
   await supabaseRest(`/pagamentos_mensais?asaas_charge_id=eq.${cobranca.id}`, {
     method: "PATCH",
@@ -220,6 +303,9 @@ Deno.serve(async (req) => {
     }
     if (action === "consultarStatus") {
       return jsonResponse(await consultarStatus(payload.chargeId));
+    }
+    if (action === "criarSubconta") {
+      return jsonResponse(await criarSubconta(payload as DadosCriarSubconta));
     }
     return jsonResponse({ error: "Ação inválida." }, 400);
   } catch (err) {

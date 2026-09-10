@@ -1,6 +1,16 @@
 import { supabase } from "@/lib/supabase";
 import type { PagamentoMensal } from "@/lib/types";
 
+export interface DadosSubconta {
+  postalCode: string;
+  address: string;
+  addressNumber: string;
+  province: string;
+  incomeValue: number;
+  birthDate?: string;
+  companyType?: string;
+}
+
 async function invocar<T>(body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke("asaas", { body });
   if (error) {
@@ -28,4 +38,9 @@ export function gerarBoleto(pagamentoId: string): Promise<PagamentoMensal> {
 /** Reconsulta o status da cobrança no Asaas e atualiza o pagamento. */
 export function consultarStatusBoleto(chargeId: string): Promise<PagamentoMensal> {
   return invocar<PagamentoMensal>({ action: "consultarStatus", chargeId });
+}
+
+/** Cria a subconta Asaas do proprietário (necessária para o split automático). */
+export function criarSubconta(proprietarioId: string, dados: DadosSubconta): Promise<{ walletId: string; jaExistia: boolean }> {
+  return invocar({ action: "criarSubconta", proprietarioId, ...dados });
 }

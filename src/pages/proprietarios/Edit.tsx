@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { PageHeader, Button, Card, LoadingState } from "@/components/ui";
-import { ProprietarioForm } from "@/components/ProprietarioForm";
+import { ProprietarioForm, type ProprietarioPayload } from "@/components/ProprietarioForm";
 import type { Proprietario } from "@/lib/types";
 import { confirmDeletion } from "@/lib/actions";
 import { useAuth } from "@/lib/auth";
+import { SubcontaAsaas } from "@/components/SubcontaAsaas";
 
 export function EditarProprietarioPage() {
   const { papel } = useAuth();
@@ -22,7 +23,7 @@ export function EditarProprietarioPage() {
       .then(({ data }) => setData(data));
   }, [id]);
 
-  async function handleSubmit(payload: Omit<Proprietario, "id" | "created_at">) {
+  async function handleSubmit(payload: ProprietarioPayload) {
     const { error } = await supabase.from("proprietarios").update(payload).eq("id", id);
     if (error) throw new Error(error.message);
     navigate("/proprietarios");
@@ -45,6 +46,11 @@ export function EditarProprietarioPage() {
         <ProprietarioForm onSubmit={handleSubmit} defaultValues={data} />
       ) : (
         <Card className="max-w-xl p-4 text-sm text-slate-600">Seu perfil possui acesso somente de leitura.</Card>
+      )}
+      {(papel === "admin" || papel === "financeiro") && (
+        <div className="max-w-xl mt-4">
+          <SubcontaAsaas proprietario={data} onWalletCriada={(walletId) => setData({ ...data, asaas_wallet_id: walletId })} />
+        </div>
       )}
       <div className="max-w-xl mt-4">
         {papel === "admin" && <Button type="button" variant="danger" onClick={handleDelete}>Excluir proprietário</Button>}

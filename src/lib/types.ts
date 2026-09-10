@@ -41,6 +41,7 @@ export interface Proprietario {
   representante_nome: string | null;
   representante_cpf: string | null;
   representante_rg: string | null;
+  asaas_wallet_id: string | null;
   created_at: string;
 }
 
@@ -122,6 +123,7 @@ export interface PagamentoMensal {
   asaas_status: string | null;
   asaas_boleto_url: string | null;
   asaas_linha_digitavel: string | null;
+  asaas_split_ativo: boolean;
   created_at: string;
   contratos?: Contrato | null;
 }
