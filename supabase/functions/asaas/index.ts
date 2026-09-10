@@ -271,6 +271,29 @@ async function registrarTransferencia(pagamentoId: string, patch: Record<string,
 }
 
 /**
+ * Juros e multa de atraso sao do proprietario, mas o split e fixado na criacao da
+ * cobranca, quando ainda nao se sabe se havera atraso. Aqui, com a cobranca ja
+ * paga, o acrescimo real e mandado para a subconta dele — descontada a tarifa que
+ * a imobiliaria pagou, ate o limite do proprio acrescimo (nunca tira do aluguel).
+ * Transferencia entre contas Asaas e gratuita e imediata.
+ */
+async function repassarAcrescimoAtraso(pagamentoId: string, cobranca: Record<string, unknown>, walletId: string) {
+  const acrescimo = Number(cobranca.interestValue ?? 0);
+  if (!(acrescimo > 0)) return 0;
+
+  const tarifa = Math.max(0, Number(cobranca.value ?? 0) - Number(cobranca.netValue ?? 0));
+  const repassar = Number(Math.max(0, acrescimo - tarifa).toFixed(2));
+  if (!(repassar > 0)) return 0;
+
+  await asaasFetch("/transfers", {
+    method: "POST",
+    body: JSON.stringify({ value: repassar, walletId, externalReference: pagamentoId }),
+  });
+  await registrarTransferencia(pagamentoId, { asaas_acrescimo_repassado: repassar });
+  return repassar;
+}
+
+/**
  * Manda o dinheiro que o split deixou na subconta do proprietário para a conta
  * bancária dele, via Pix. Nunca lança: o chamador (webhook) precisa seguir.
  */
@@ -300,7 +323,7 @@ async function transferirParaProprietario(pagamentoId: string) {
     return { ok: false, erro };
   }
 
-  const valor = Number(pagamento.valor_bruto) - Number(pagamento.valor);
+  const valor = Number(pagamento.valor_bruto) - Number(pagamento.valor) + Number(pagamento.asaas_acrescimo_repassado ?? 0);
   try {
     const transferencia = await asaasFetch(
       "/transfers",
@@ -376,7 +399,23 @@ async function receberWebhook(req: Request) {
     body: JSON.stringify(patch),
   });
 
-  if (pagamentoParaTransferir) await transferirParaProprietario(pagamentoParaTransferir);
+  if (pagamentoParaTransferir) {
+    // O acrescimo precisa cair na subconta antes do Pix, senao o Pix sai so com o aluguel.
+    const [dados] = await supabaseRest(
+      `/pagamentos_mensais?id=eq.${pagamentoParaTransferir}&select=contratos(imoveis(proprietarios(asaas_wallet_id)))`
+    );
+    const walletId = dados?.contratos?.imoveis?.proprietarios?.asaas_wallet_id;
+    if (walletId) {
+      try {
+        await repassarAcrescimoAtraso(pagamentoParaTransferir, cobranca, walletId);
+      } catch (err) {
+        await registrarTransferencia(pagamentoParaTransferir, {
+          asaas_transfer_erro: `Falha ao repassar juros/multa: ${err instanceof Error ? err.message : "erro"}`,
+        });
+      }
+    }
+    await transferirParaProprietario(pagamentoParaTransferir);
+  }
   return jsonResponse({ ok: true });
 }
 

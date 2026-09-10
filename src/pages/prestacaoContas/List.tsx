@@ -199,6 +199,11 @@ export function PrestacaoContasListPage() {
                         )}
                         {p.asaas_split_ativo && (
                           <div className="mt-1 flex flex-col gap-1 text-xs">
+                            {Number(p.asaas_acrescimo_repassado ?? 0) > 0 && (
+                              <span className="text-slate-600">
+                                + {formatBRL(p.asaas_acrescimo_repassado)} de juros/multa
+                              </span>
+                            )}
                             <span className={p.asaas_transfer_status === "DONE" ? "text-slate-600" : "text-slate-500"}>
                               {TRANSFER_LABEL[p.asaas_transfer_status ?? ""] ?? "aguardando transferência"}
                             </span>
