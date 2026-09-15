@@ -6,6 +6,7 @@ import { applyFormValues, getDraftValue, upper, upperOrNull, useFormDraft, valid
 import { consultarCNPJ } from "@/lib/cnpj";
 import { PhoneInput } from "@/components/PhoneInput";
 import { PixInput } from "@/components/PixInput";
+import { QualificacaoInputs } from "@/components/QualificacaoInputs";
 
 export type ProprietarioPayload = Omit<Proprietario, "id" | "created_at" | "asaas_wallet_id">;
 
@@ -50,6 +51,9 @@ export function ProprietarioForm({
         observacoes: upperOrNull(formData.get("observacoes")),
         endereco: upperOrNull(formData.get("endereco")),
         rg: tipoPessoa === "fisica" ? upperOrNull(formData.get("rg")) : null,
+        nacionalidade: tipoPessoa === "fisica" ? upperOrNull(formData.get("nacionalidade")) : null,
+        estado_civil: tipoPessoa === "fisica" ? (formData.get("estado_civil") as Proprietario["estado_civil"]) || null : null,
+        profissao: tipoPessoa === "fisica" ? upperOrNull(formData.get("profissao")) : null,
         banco: upperOrNull(formData.get("banco")),
         agencia: upperOrNull(formData.get("agencia")),
         conta: upperOrNull(formData.get("conta")),
@@ -106,6 +110,14 @@ export function ProprietarioForm({
             <Input id="rg" name="rg" defaultValue={defaultValues?.rg ?? ""} />
           </Field>}
         </div>
+
+        {tipoPessoa === "fisica" && (
+          <QualificacaoInputs
+            nacionalidade={defaultValues?.nacionalidade}
+            estadoCivil={defaultValues?.estado_civil}
+            profissao={defaultValues?.profissao}
+          />
+        )}
 
         {tipoPessoa === "juridica" && (
           <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">

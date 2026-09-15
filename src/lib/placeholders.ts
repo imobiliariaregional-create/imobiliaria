@@ -49,6 +49,9 @@ export function resolverPlaceholders({ contrato, imovel, proprietario, pessoa }:
   v.telefone_proprietario = proprietario.telefone ?? "";
   v.email_proprietario = proprietario.email ?? "";
   v.natureza_proprietario = proprietario.tipo_pessoa === "juridica" ? "Pessoa Jurídica" : "Pessoa Física";
+  v.nacionalidade_proprietario = proprietario.nacionalidade ?? "";
+  v.estado_civil_proprietario = proprietario.estado_civil ?? "";
+  v.profissao_proprietario = proprietario.profissao ?? "";
   v.representante_nome_proprietario = proprietario.representante_nome ?? "";
   v.representante_cpf_proprietario = proprietario.representante_cpf ?? "";
   v.representante_rg_proprietario = proprietario.representante_rg ?? "";
@@ -75,6 +78,9 @@ export function resolverPlaceholders({ contrato, imovel, proprietario, pessoa }:
     v[`endereco_${alias}`] = v.endereco_proprietario;
     v[`telefone_${alias}`] = v.telefone_proprietario;
     v[`email_${alias}`] = v.email_proprietario;
+    v[`nacionalidade_${alias}`] = v.nacionalidade_proprietario;
+    v[`estado_civil_${alias}`] = v.estado_civil_proprietario;
+    v[`profissao_${alias}`] = v.profissao_proprietario;
   }
 
   // ===== Inquilino/Comprador =====
@@ -85,6 +91,9 @@ export function resolverPlaceholders({ contrato, imovel, proprietario, pessoa }:
   v.telefone_pessoa = pessoa?.telefone ?? "";
   v.email_pessoa = pessoa?.email ?? "";
   v.natureza_pessoa = pessoa?.tipo_pessoa === "juridica" ? "Pessoa Jurídica" : "Pessoa Física";
+  v.nacionalidade_pessoa = pessoa?.nacionalidade ?? "";
+  v.estado_civil_pessoa = pessoa?.estado_civil ?? "";
+  v.profissao_pessoa = pessoa?.profissao ?? "";
   v.representante_nome_pessoa = pessoa?.representante_nome ?? "";
   v.representante_cpf_pessoa = pessoa?.representante_cpf ?? "";
   v.representante_rg_pessoa = pessoa?.representante_rg ?? "";
@@ -96,6 +105,9 @@ export function resolverPlaceholders({ contrato, imovel, proprietario, pessoa }:
     v[`endereco_${alias}`] = v.endereco_pessoa;
     v[`telefone_${alias}`] = v.telefone_pessoa;
     v[`email_${alias}`] = v.email_pessoa;
+    v[`nacionalidade_${alias}`] = v.nacionalidade_pessoa;
+    v[`estado_civil_${alias}`] = v.estado_civil_pessoa;
+    v[`profissao_${alias}`] = v.profissao_pessoa;
   }
 
   // ===== Imóvel =====
@@ -169,6 +181,9 @@ export const PLACEHOLDERS: PlaceholderInfo[] = [
   { codigo: "#telefone_proprietario", descricao: "Telefone do proprietário", categoria: "Proprietário" },
   { codigo: "#email_proprietario", descricao: "E-mail do proprietário", categoria: "Proprietário" },
   { codigo: "#natureza_proprietario", descricao: "\"Pessoa Física\" ou \"Pessoa Jurídica\"", categoria: "Proprietário" },
+  { codigo: "#nacionalidade_proprietario", descricao: "Nacionalidade (aliases: #nacionalidade_locador, #nacionalidade_vendedor)", categoria: "Proprietário" },
+  { codigo: "#estado_civil_proprietario", descricao: "Estado civil (aliases: #estado_civil_locador, #estado_civil_vendedor)", categoria: "Proprietário" },
+  { codigo: "#profissao_proprietario", descricao: "Profissão (aliases: #profissao_locador, #profissao_vendedor)", categoria: "Proprietário" },
   { codigo: "#representante_nome_proprietario", descricao: "Nome do representante legal (quando pessoa jurídica)", categoria: "Proprietário" },
   { codigo: "#representante_cpf_proprietario", descricao: "CPF do representante legal", categoria: "Proprietário" },
   { codigo: "#representante_rg_proprietario", descricao: "RG do representante legal", categoria: "Proprietário" },
@@ -188,6 +203,9 @@ export const PLACEHOLDERS: PlaceholderInfo[] = [
   { codigo: "#telefone_pessoa", descricao: "Telefone", categoria: "Inquilino/Comprador" },
   { codigo: "#email_pessoa", descricao: "E-mail", categoria: "Inquilino/Comprador" },
   { codigo: "#natureza_pessoa", descricao: "\"Pessoa Física\" ou \"Pessoa Jurídica\"", categoria: "Inquilino/Comprador" },
+  { codigo: "#nacionalidade_pessoa", descricao: "Nacionalidade (aliases: #nacionalidade_locatario, #nacionalidade_comprador)", categoria: "Inquilino/Comprador" },
+  { codigo: "#estado_civil_pessoa", descricao: "Estado civil (aliases: #estado_civil_locatario, #estado_civil_comprador)", categoria: "Inquilino/Comprador" },
+  { codigo: "#profissao_pessoa", descricao: "Profissão (aliases: #profissao_locatario, #profissao_comprador)", categoria: "Inquilino/Comprador" },
   { codigo: "#representante_nome_pessoa", descricao: "Nome do representante legal (quando pessoa jurídica)", categoria: "Inquilino/Comprador" },
   { codigo: "#representante_cpf_pessoa", descricao: "CPF do representante legal", categoria: "Inquilino/Comprador" },
   { codigo: "#representante_rg_pessoa", descricao: "RG do representante legal", categoria: "Inquilino/Comprador" },

@@ -11,6 +11,7 @@ export type TipoPessoa = "fisica" | "juridica";
 export type TipoContaBancaria = "corrente" | "poupanca";
 export type TipoImovel = "residencial" | "comercial";
 export type TipoChavePix = "cpf" | "cnpj" | "telefone" | "email" | "aleatoria";
+export type EstadoCivil = "SOLTEIRO(A)" | "CASADO(A)" | "DIVORCIADO(A)" | "VIÚVO(A)" | "SEPARADO(A)" | "UNIÃO ESTÁVEL";
 export type PapelUsuario = "admin" | "financeiro" | "corretor";
 export type StatusAutorizacao = "ativa" | "encerrada" | "cancelada";
 
@@ -41,6 +42,9 @@ export interface Proprietario {
   representante_nome: string | null;
   representante_cpf: string | null;
   representante_rg: string | null;
+  nacionalidade: string | null;
+  estado_civil: EstadoCivil | null;
+  profissao: string | null;
   asaas_wallet_id: string | null;
   created_at: string;
 }
@@ -57,6 +61,9 @@ export interface Pessoa {
   representante_nome: string | null;
   representante_cpf: string | null;
   representante_rg: string | null;
+  nacionalidade: string | null;
+  estado_civil: EstadoCivil | null;
+  profissao: string | null;
   asaas_customer_id: string | null;
   created_at: string;
 }

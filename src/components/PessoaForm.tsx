@@ -5,6 +5,7 @@ import { DocumentoInput } from "@/components/DocumentoInput";
 import { applyFormValues, getDraftValue, upper, upperOrNull, useFormDraft, validateCPFCNPJ } from "@/lib/forms";
 import { consultarCNPJ } from "@/lib/cnpj";
 import { PhoneInput } from "@/components/PhoneInput";
+import { QualificacaoInputs } from "@/components/QualificacaoInputs";
 
 export type PessoaPayload = Omit<Pessoa, "id" | "created_at" | "asaas_customer_id">;
 
@@ -44,6 +45,9 @@ export function PessoaForm({
         telefone: (formData.get("telefone") as string) || null,
         email: (formData.get("email") as string) || null,
         rg: tipoPessoa === "fisica" ? upperOrNull(formData.get("rg")) : null,
+        nacionalidade: tipoPessoa === "fisica" ? upperOrNull(formData.get("nacionalidade")) : null,
+        estado_civil: tipoPessoa === "fisica" ? (formData.get("estado_civil") as Pessoa["estado_civil"]) || null : null,
+        profissao: tipoPessoa === "fisica" ? upperOrNull(formData.get("profissao")) : null,
         endereco: upperOrNull(formData.get("endereco")),
         tipo_pessoa: tipoPessoa,
         representante_nome: tipoPessoa === "juridica" ? upperOrNull(formData.get("representante_nome")) : null,
@@ -97,6 +101,14 @@ export function PessoaForm({
             <Input id="rg" name="rg" defaultValue={defaultValues?.rg ?? ""} />
           </Field>}
         </div>
+
+        {tipoPessoa === "fisica" && (
+          <QualificacaoInputs
+            nacionalidade={defaultValues?.nacionalidade}
+            estadoCivil={defaultValues?.estado_civil}
+            profissao={defaultValues?.profissao}
+          />
+        )}
 
         {tipoPessoa === "juridica" && (
           <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
