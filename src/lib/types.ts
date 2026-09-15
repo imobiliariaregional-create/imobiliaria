@@ -135,6 +135,7 @@ export interface PagamentoMensal {
   asaas_transfer_status: string | null;
   asaas_transfer_erro: string | null;
   asaas_acrescimo_repassado: number | null;
+  asaas_acrescimo_cobrado: number | null;
   created_at: string;
   contratos?: Contrato | null;
 }

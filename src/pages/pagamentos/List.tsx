@@ -7,7 +7,7 @@ import type { PagamentoMensal } from "@/lib/types";
 import { useAuth } from "@/lib/auth";
 import { normalizeSearch } from "@/lib/forms";
 import { enderecoImovel } from "@/lib/imovelLabel";
-import { gerarBoleto, consultarStatusBoleto } from "@/lib/asaas";
+import { gerarBoleto, consultarStatusBoleto, simularBoleto, type CorrecaoBoleto } from "@/lib/asaas";
 
 const ASAAS_STATUS_LABEL: Record<string, string> = {
   PENDING: "Aguardando pagamento",
@@ -16,6 +16,22 @@ const ASAAS_STATUS_LABEL: Record<string, string> = {
   OVERDUE: "Vencido",
   REFUNDED: "Estornado",
 };
+
+/** A Asaas não aceita vencimento retroativo: aluguel vencido vira boleto novo, já corrigido. */
+function mensagemCorrecao(c: CorrecaoBoleto): string {
+  return [
+    `Aluguel vencido em ${formatDate(c.vencimentoOriginal)} (${c.diasAtraso} dias).`,
+    "",
+    `Aluguel:         ${formatBRL(c.valorOriginal)}`,
+    `Multa (2%):      ${formatBRL(c.multa)}`,
+    `Juros (1%/mês):  ${formatBRL(c.juros)}`,
+    `Total:           ${formatBRL(c.total)}`,
+    "",
+    `Vencimento do novo boleto: ${formatDate(c.novoVencimento)}`,
+    "",
+    "Gerar o boleto com esse valor?",
+  ].join("\n");
+}
 
 /** Contratos de administração com repasse direto ao proprietário ainda não têm split configurado. */
 function podeGerarBoleto(p: PagamentoMensal): boolean {
@@ -95,6 +111,8 @@ export function PagamentosListPage() {
     setErroBoleto(null);
     setBoletoPendingId(p.id);
     try {
+      const correcao = await simularBoleto(p.id);
+      if (correcao.vencido && !window.confirm(mensagemCorrecao(correcao))) return;
       await gerarBoleto(p.id);
       await reload();
     } catch (err) {

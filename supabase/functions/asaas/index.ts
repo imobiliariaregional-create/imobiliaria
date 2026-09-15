@@ -114,6 +114,79 @@ interface DadosGerarBoleto {
   pagamentoId: string;
 }
 
+const MULTA_PERCENTUAL = 2;
+const JUROS_MENSAL_PERCENTUAL = 1;
+const DIAS_ATE_NOVO_VENCIMENTO = 5;
+
+/** Data de hoje no fuso de Brasilia — o servidor roda em UTC e viraria o dia cedo demais. */
+function hojeSaoPaulo(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+}
+
+function somarDias(dataISO: string, dias: number): string {
+  const d = new Date(`${dataISO}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + dias);
+  return d.toISOString().slice(0, 10);
+}
+
+function diferencaEmDias(de: string, ate: string): number {
+  const ms = new Date(`${ate}T12:00:00Z`).getTime() - new Date(`${de}T12:00:00Z`).getTime();
+  return Math.round(ms / 86400000);
+}
+
+interface Correcao {
+  vencido: boolean;
+  diasAtraso: number;
+  valorOriginal: number;
+  multa: number;
+  juros: number;
+  total: number;
+  novoVencimento: string;
+  vencimentoOriginal: string;
+}
+
+/**
+ * A Asaas recusa cobranca com vencimento retroativo, entao o aluguel atrasado vira
+ * um boleto novo com multa e juros ja embutidos. A multa e aplicada uma unica vez;
+ * os juros sao pro rata die, ate o vencimento do boleto novo.
+ */
+function calcularCorrecao(valorBruto: number, vencimentoOriginal: string): Correcao {
+  const hoje = hojeSaoPaulo();
+  const base = {
+    valorOriginal: valorBruto,
+    vencimentoOriginal,
+    multa: 0,
+    juros: 0,
+    total: valorBruto,
+  };
+  if (vencimentoOriginal >= hoje) {
+    return { ...base, vencido: false, diasAtraso: 0, novoVencimento: vencimentoOriginal };
+  }
+
+  const novoVencimento = somarDias(hoje, DIAS_ATE_NOVO_VENCIMENTO);
+  const diasAtraso = diferencaEmDias(vencimentoOriginal, novoVencimento);
+  const multa = Number((valorBruto * (MULTA_PERCENTUAL / 100)).toFixed(2));
+  const juros = Number((valorBruto * (JUROS_MENSAL_PERCENTUAL / 100) * (diasAtraso / 30)).toFixed(2));
+  return {
+    vencido: true,
+    diasAtraso,
+    valorOriginal: valorBruto,
+    vencimentoOriginal,
+    multa,
+    juros,
+    total: Number((valorBruto + multa + juros).toFixed(2)),
+    novoVencimento,
+  };
+}
+
+async function simularBoleto({ pagamentoId }: DadosGerarBoleto): Promise<Correcao> {
+  const [pagamento] = await supabaseRest(`/pagamentos_mensais?id=eq.${pagamentoId}&select=*,contratos(tipo)`);
+  if (!pagamento) throw new HttpError("Pagamento não encontrado.", 404);
+  const valorCobranca =
+    pagamento.contratos?.tipo === "administracao" ? pagamento.valor_bruto : pagamento.valor;
+  return calcularCorrecao(Number(valorCobranca), pagamento.data_vencimento);
+}
+
 async function gerarBoleto({ pagamentoId }: DadosGerarBoleto) {
   const [pagamento] = await supabaseRest(
     `/pagamentos_mensais?id=eq.${pagamentoId}&select=*,contratos(*,pessoas(*),imoveis(*,proprietarios(*)))`
@@ -131,6 +204,7 @@ async function gerarBoleto({ pagamentoId }: DadosGerarBoleto) {
   }
 
   const valorCobranca = contrato.tipo === "administracao" ? pagamento.valor_bruto : pagamento.valor;
+  const correcao = calcularCorrecao(Number(valorCobranca), pagamento.data_vencimento);
   const customerId = await obterOuCriarCliente(pessoa);
 
   let splitAtivo = false;
@@ -151,11 +225,12 @@ async function gerarBoleto({ pagamentoId }: DadosGerarBoleto) {
     body: JSON.stringify({
       customer: customerId,
       billingType: "BOLETO",
-      value: Number(valorCobranca),
-      dueDate: pagamento.data_vencimento,
+      value: correcao.total,
+      dueDate: correcao.novoVencimento,
       description: `Aluguel referente a ${pagamento.mes_referencia?.slice(0, 7) ?? ""}`,
-      fine: { value: 2, type: "PERCENTAGE" },
-      interest: { value: 1 },
+      // Vencido ja sai com a multa embutida — cobrar os 2% de novo seria multa em duplicidade.
+      fine: { value: correcao.vencido ? 0 : MULTA_PERCENTUAL, type: "PERCENTAGE" },
+      interest: { value: JUROS_MENSAL_PERCENTUAL },
       split,
     }),
   });
@@ -180,6 +255,7 @@ async function gerarBoleto({ pagamentoId }: DadosGerarBoleto) {
       asaas_boleto_url: cobranca.bankSlipUrl ?? cobranca.invoiceUrl ?? null,
       asaas_linha_digitavel: linhaDigitavel,
       asaas_split_ativo: splitAtivo,
+      asaas_acrescimo_cobrado: correcao.vencido ? Number((correcao.multa + correcao.juros).toFixed(2)) : null,
     }),
   });
   return atualizado;
@@ -278,7 +354,11 @@ async function registrarTransferencia(pagamentoId: string, patch: Record<string,
  * Transferencia entre contas Asaas e gratuita e imediata.
  */
 async function repassarAcrescimoAtraso(pagamentoId: string, cobranca: Record<string, unknown>, walletId: string) {
-  const acrescimo = Number(cobranca.interestValue ?? 0);
+  // Dois acrescimos podem coexistir: o que ja veio embutido no boleto (aluguel que
+  // estava vencido na emissao) e o que a Asaas cobrou por atraso do proprio boleto.
+  const [pagamento] = await supabaseRest(`/pagamentos_mensais?id=eq.${pagamentoId}&select=asaas_acrescimo_cobrado`);
+  const embutido = Number(pagamento?.asaas_acrescimo_cobrado ?? 0);
+  const acrescimo = Number(cobranca.interestValue ?? 0) + embutido;
   if (!(acrescimo > 0)) return 0;
 
   const tarifa = Math.max(0, Number(cobranca.value ?? 0) - Number(cobranca.netValue ?? 0));
@@ -437,6 +517,9 @@ Deno.serve(async (req) => {
     }
     if (action === "consultarStatus") {
       return jsonResponse(await consultarStatus(payload.chargeId));
+    }
+    if (action === "simularBoleto") {
+      return jsonResponse(await simularBoleto(payload as DadosGerarBoleto));
     }
     if (action === "criarSubconta") {
       return jsonResponse(await criarSubconta(payload as DadosCriarSubconta));

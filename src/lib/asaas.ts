@@ -45,6 +45,22 @@ export function transferirRepasse(pagamentoId: string): Promise<{ transferId?: s
   return invocar({ action: "transferirRepasse", pagamentoId });
 }
 
+export interface CorrecaoBoleto {
+  vencido: boolean;
+  diasAtraso: number;
+  valorOriginal: number;
+  multa: number;
+  juros: number;
+  total: number;
+  novoVencimento: string;
+  vencimentoOriginal: string;
+}
+
+/** Calcula multa e juros de um aluguel vencido, sem criar nada no Asaas. */
+export function simularBoleto(pagamentoId: string): Promise<CorrecaoBoleto> {
+  return invocar<CorrecaoBoleto>({ action: "simularBoleto", pagamentoId });
+}
+
 /** Cria a subconta Asaas do proprietário (necessária para o split automático). */
 export function criarSubconta(proprietarioId: string, dados: DadosSubconta): Promise<{ walletId: string; jaExistia: boolean }> {
   return invocar({ action: "criarSubconta", proprietarioId, ...dados });
