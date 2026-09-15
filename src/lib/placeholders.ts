@@ -26,6 +26,18 @@ function enderecoCompletoImovel(imovel: Imovel): string {
   return partes.join(" - ");
 }
 
+/**
+ * ", brasileiro(a), casado(a), comerciante" — a vírgula vem no início, e não no
+ * fim, para o texto fechar certo nos dois casos quando escrito como
+ * "#nome_locatario#qualificacao_locatario, inscrito(a) no CPF":
+ * pessoa física vira "FULANO, brasileiro(a), ..., inscrito(a)" e pessoa jurídica
+ * (que não tem estado civil nem profissão) vira "EMPRESA LTDA, inscrito(a)".
+ */
+function qualificacaoCivil(dados: { nacionalidade: string | null; estado_civil: string | null; profissao: string | null }): string {
+  const partes = [dados.nacionalidade, dados.estado_civil, dados.profissao].filter(Boolean);
+  return partes.length > 0 ? `, ${partes.join(", ")}` : "";
+}
+
 function numeroContratoExtenso(numero: string): string {
   const correspondencia = numero.match(/^(?:[A-Z]+-)?(\d+)\/(\d{2,4})$/i);
   if (!correspondencia) return "";
@@ -52,6 +64,7 @@ export function resolverPlaceholders({ contrato, imovel, proprietario, pessoa }:
   v.nacionalidade_proprietario = proprietario.nacionalidade ?? "";
   v.estado_civil_proprietario = proprietario.estado_civil ?? "";
   v.profissao_proprietario = proprietario.profissao ?? "";
+  v.qualificacao_proprietario = qualificacaoCivil(proprietario);
   v.representante_nome_proprietario = proprietario.representante_nome ?? "";
   v.representante_cpf_proprietario = proprietario.representante_cpf ?? "";
   v.representante_rg_proprietario = proprietario.representante_rg ?? "";
@@ -81,6 +94,7 @@ export function resolverPlaceholders({ contrato, imovel, proprietario, pessoa }:
     v[`nacionalidade_${alias}`] = v.nacionalidade_proprietario;
     v[`estado_civil_${alias}`] = v.estado_civil_proprietario;
     v[`profissao_${alias}`] = v.profissao_proprietario;
+    v[`qualificacao_${alias}`] = v.qualificacao_proprietario;
   }
 
   // ===== Inquilino/Comprador =====
@@ -94,6 +108,9 @@ export function resolverPlaceholders({ contrato, imovel, proprietario, pessoa }:
   v.nacionalidade_pessoa = pessoa?.nacionalidade ?? "";
   v.estado_civil_pessoa = pessoa?.estado_civil ?? "";
   v.profissao_pessoa = pessoa?.profissao ?? "";
+  v.qualificacao_pessoa = pessoa
+    ? qualificacaoCivil(pessoa)
+    : "";
   v.representante_nome_pessoa = pessoa?.representante_nome ?? "";
   v.representante_cpf_pessoa = pessoa?.representante_cpf ?? "";
   v.representante_rg_pessoa = pessoa?.representante_rg ?? "";
@@ -108,6 +125,7 @@ export function resolverPlaceholders({ contrato, imovel, proprietario, pessoa }:
     v[`nacionalidade_${alias}`] = v.nacionalidade_pessoa;
     v[`estado_civil_${alias}`] = v.estado_civil_pessoa;
     v[`profissao_${alias}`] = v.profissao_pessoa;
+    v[`qualificacao_${alias}`] = v.qualificacao_pessoa;
   }
 
   // ===== Imóvel =====
@@ -184,6 +202,7 @@ export const PLACEHOLDERS: PlaceholderInfo[] = [
   { codigo: "#nacionalidade_proprietario", descricao: "Nacionalidade (aliases: #nacionalidade_locador, #nacionalidade_vendedor)", categoria: "Proprietário" },
   { codigo: "#estado_civil_proprietario", descricao: "Estado civil (aliases: #estado_civil_locador, #estado_civil_vendedor)", categoria: "Proprietário" },
   { codigo: "#profissao_proprietario", descricao: "Profissão (aliases: #profissao_locador, #profissao_vendedor)", categoria: "Proprietário" },
+  { codigo: "#qualificacao_proprietario", descricao: "Nacionalidade, estado civil e profissão numa linha, com vírgula no início (vazio se pessoa jurídica). Use colado no nome: #nome_locatario#qualificacao_locatario, inscrito(a).... Aliases: #qualificacao_locador, #qualificacao_vendedor", categoria: "Proprietário" },
   { codigo: "#representante_nome_proprietario", descricao: "Nome do representante legal (quando pessoa jurídica)", categoria: "Proprietário" },
   { codigo: "#representante_cpf_proprietario", descricao: "CPF do representante legal", categoria: "Proprietário" },
   { codigo: "#representante_rg_proprietario", descricao: "RG do representante legal", categoria: "Proprietário" },
@@ -206,6 +225,7 @@ export const PLACEHOLDERS: PlaceholderInfo[] = [
   { codigo: "#nacionalidade_pessoa", descricao: "Nacionalidade (aliases: #nacionalidade_locatario, #nacionalidade_comprador)", categoria: "Inquilino/Comprador" },
   { codigo: "#estado_civil_pessoa", descricao: "Estado civil (aliases: #estado_civil_locatario, #estado_civil_comprador)", categoria: "Inquilino/Comprador" },
   { codigo: "#profissao_pessoa", descricao: "Profissão (aliases: #profissao_locatario, #profissao_comprador)", categoria: "Inquilino/Comprador" },
+  { codigo: "#qualificacao_pessoa", descricao: "Nacionalidade, estado civil e profissão numa linha, com vírgula no início (vazio se pessoa jurídica). Use colado no nome: #nome_locatario#qualificacao_locatario, inscrito(a).... Aliases: #qualificacao_locatario, #qualificacao_comprador", categoria: "Inquilino/Comprador" },
   { codigo: "#representante_nome_pessoa", descricao: "Nome do representante legal (quando pessoa jurídica)", categoria: "Inquilino/Comprador" },
   { codigo: "#representante_cpf_pessoa", descricao: "CPF do representante legal", categoria: "Inquilino/Comprador" },
   { codigo: "#representante_rg_pessoa", descricao: "RG do representante legal", categoria: "Inquilino/Comprador" },
