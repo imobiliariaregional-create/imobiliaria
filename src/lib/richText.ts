@@ -18,6 +18,8 @@ export interface ParagraphBlock {
 export interface TableCell {
   runs: TextRun[];
   background?: string; // hex sem "#", ex: "1E293B"
+  align?: Align;
+  width?: number; // porcentagem da largura da tabela
 }
 
 export interface TableBlock {
@@ -108,6 +110,31 @@ function runsFromInline(node: Node, bold: boolean, italic: boolean, color?: stri
   return runs;
 }
 
+/**
+ * O alinhamento pode estar na própria célula ou num elemento interno — o
+ * execCommand do navegador costuma aplicar num <div>/<p> dentro do <td>.
+ */
+function alignDaCelula(cell: Element): Align | undefined {
+  const naCelula = (cell as HTMLElement).style?.textAlign;
+  if (naCelula) return normalizarAlign(naCelula);
+  const interno = cell.querySelector("[style*='text-align']");
+  const doInterno = interno ? (interno as HTMLElement).style?.textAlign : "";
+  return doInterno ? normalizarAlign(doInterno) : undefined;
+}
+
+function normalizarAlign(valor: string): Align | undefined {
+  const v = valor.trim().toLowerCase();
+  return v === "center" || v === "right" || v === "justify" || v === "left" ? v : undefined;
+}
+
+function larguraDaCelula(cell: Element): number | undefined {
+  const bruto = (cell as HTMLElement).style?.width || cell.getAttribute("width") || "";
+  const m = bruto.match(/^([\d.]+)\s*%$/);
+  if (!m) return undefined;
+  const n = Number(m[1]);
+  return Number.isFinite(n) && n > 0 && n <= 100 ? n : undefined;
+}
+
 /** Converte o HTML de uma cláusula em blocos (parágrafos/tabelas) para gerar PDF/Word. */
 export function parseClauseHtml(html: string): ContentBlock[] {
   const doc = new DOMParser().parseFromString(sanitizeClauseHtml(ensureClauseHtml(html)), "text/html");
@@ -123,7 +150,12 @@ export function parseClauseHtml(html: string): ContentBlock[] {
       el.querySelectorAll("tr").forEach((tr) => {
         const row: TableCell[] = [];
         tr.querySelectorAll("td, th").forEach((cell) => {
-          row.push({ runs: runsFromInline(cell, false, false, corDeElemento(cell)), background: backgroundFromStyle(cell) });
+          row.push({
+            runs: runsFromInline(cell, false, false, corDeElemento(cell)),
+            background: backgroundFromStyle(cell),
+            align: alignDaCelula(cell),
+            width: larguraDaCelula(cell),
+          });
         });
         if (row.length > 0) rows.push(row);
       });

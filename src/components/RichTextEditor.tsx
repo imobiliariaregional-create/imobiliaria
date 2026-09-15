@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Bold, Italic, AlignLeft, AlignCenter, AlignRight, AlignJustify, Table2, Trash2, Baseline, PaintBucket, Eraser } from "lucide-react";
+import { Bold, Italic, AlignLeft, AlignCenter, AlignRight, AlignJustify, Table2, Columns3, Trash2, Baseline, PaintBucket, Eraser } from "lucide-react";
 import { sanitizeClauseHtml, ensureClauseHtml } from "@/lib/richText";
 
 function ToolbarButton({
@@ -28,10 +28,19 @@ function ToolbarButton({
 
 const COR_TEXTO_PADRAO = "#17201c";
 
-function montarTabelaHtml(linhas: number, colunas: number): string {
-  const celula = `<td style="border:1px solid #94a3b8;padding:6px 8px;min-width:60px;">&nbsp;</td>`;
-  const linha = `<tr>${celula.repeat(colunas)}</tr>`;
-  return `<table style="border-collapse:collapse;width:100%;">${linha.repeat(linhas)}</table><p><br></p>`;
+const COR_CABECALHO_TABELA = "#1f3864";
+
+function montarTabelaHtml(linhas: number, colunas: number, comCabecalho: boolean): string {
+  const largura = (100 / colunas).toFixed(2);
+  const borda = comCabecalho ? COR_CABECALHO_TABELA : "#94a3b8";
+  const base = `border:1px solid ${borda};padding:6px 8px;width:${largura}%;`;
+
+  const celulaCabecalho = `<td style="${base}background-color:${COR_CABECALHO_TABELA};color:#ffffff;text-align:center;"><b>&nbsp;</b></td>`;
+  const celulaCorpo = `<td style="${base}">&nbsp;</td>`;
+
+  const corpo = `<tr>${celulaCorpo.repeat(colunas)}</tr>`.repeat(comCabecalho ? Math.max(0, linhas - 1) : linhas);
+  const cabecalho = comCabecalho ? `<tr>${celulaCabecalho.repeat(colunas)}</tr>` : "";
+  return `<table style="border-collapse:collapse;width:100%;">${cabecalho}${corpo}</table><p><br></p>`;
 }
 
 export function RichTextEditor({
@@ -53,6 +62,11 @@ export function RichTextEditor({
   const [tabelaAberta, setTabelaAberta] = useState(false);
   const [linhas, setLinhas] = useState(2);
   const [colunas, setColunas] = useState(2);
+  const [comCabecalho, setComCabecalho] = useState(true);
+  const [larguraAberta, setLarguraAberta] = useState(false);
+  const [larguraColuna, setLarguraColuna] = useState(33);
+  const [erroLargura, setErroLargura] = useState<string | null>(null);
+  const celulaLarguraRef = useRef<HTMLTableCellElement | null>(null);
 
   useEffect(() => {
     const html = ensureClauseHtml(value);
@@ -98,7 +112,11 @@ export function RichTextEditor({
         sel.addRange(range);
       }
     }
-    document.execCommand("insertHTML", false, montarTabelaHtml(Math.max(1, Math.min(20, linhas)), Math.max(1, Math.min(10, colunas))));
+    document.execCommand(
+      "insertHTML",
+      false,
+      montarTabelaHtml(Math.max(1, Math.min(20, linhas)), Math.max(1, Math.min(10, colunas)), comCabecalho)
+    );
     emitChange();
     setTabelaAberta(false);
   }
@@ -116,6 +134,34 @@ export function RichTextEditor({
       }
       node = node.parentNode;
     }
+  }
+
+  function abrirLargura() {
+    const celula = localizarCelula();
+    if (!celula) {
+      setErroLargura("Clique dentro de uma célula da tabela antes.");
+      return;
+    }
+    // Guarda a celula agora: ao clicar no campo do popover a selecao do editor se perde.
+    celulaLarguraRef.current = celula;
+    const atual = celula.style.width.match(/^([\d.]+)%$/);
+    if (atual) setLarguraColuna(Math.round(Number(atual[1])));
+    setErroLargura(null);
+    setLarguraAberta(true);
+  }
+
+  /** Aplica a largura na coluna inteira — largura de uma celula so o navegador ignora. */
+  function definirLarguraDaColuna(porcentagem: number) {
+    const celula = celulaLarguraRef.current;
+    const tabela = celula?.closest("table");
+    if (!celula || !tabela) return;
+    const indice = Array.from(celula.parentElement?.children ?? []).indexOf(celula);
+    if (indice < 0) return;
+    tabela.querySelectorAll("tr").forEach((tr) => {
+      const alvo = tr.children[indice] as HTMLElement | undefined;
+      if (alvo) alvo.style.width = `${porcentagem}%`;
+    });
+    emitChange();
   }
 
   function localizarCelula(): HTMLTableCellElement | null {
@@ -197,6 +243,9 @@ export function RichTextEditor({
         <ToolbarButton title="Inserir tabela" onMouseDown={abrirTabela}>
           <Table2 size={15} />
         </ToolbarButton>
+        <ToolbarButton title="Largura da coluna (clique numa célula antes)" onMouseDown={abrirLargura}>
+          <Columns3 size={15} />
+        </ToolbarButton>
         <ToolbarButton title="Remover tabela (clique dentro dela antes)" onMouseDown={removerTabela}>
           <Trash2 size={15} />
         </ToolbarButton>
@@ -228,6 +277,50 @@ export function RichTextEditor({
         />
       </div>
 
+      {erroLargura && (
+        <div className="absolute left-1 top-11 z-10 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 shadow-lg">
+          {erroLargura}
+          <button type="button" className="ml-2 underline" onMouseDown={(e) => e.preventDefault()} onClick={() => setErroLargura(null)}>
+            ok
+          </button>
+        </div>
+      )}
+
+      {larguraAberta && (
+        <div className="absolute left-1 top-11 z-10 flex items-end gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
+          <label className="text-xs text-slate-600">
+            Largura da coluna (%)
+            <input
+              type="number"
+              min={5}
+              max={100}
+              value={larguraColuna}
+              onChange={(e) => setLarguraColuna(Number(e.target.value))}
+              className="mt-1 block w-20 rounded-lg border border-slate-300 px-2 py-1 text-sm"
+            />
+          </label>
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              definirLarguraDaColuna(Math.max(5, Math.min(100, larguraColuna)));
+              setLarguraAberta(false);
+            }}
+            className="rounded-lg bg-brand-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-800"
+          >
+            Aplicar
+          </button>
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setLarguraAberta(false)}
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
+          >
+            Cancelar
+          </button>
+        </div>
+      )}
+
       {tabelaAberta && (
         <div className="absolute left-1 top-11 z-10 flex items-end gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
           <label className="text-xs text-slate-600">
@@ -251,6 +344,10 @@ export function RichTextEditor({
               onChange={(e) => setColunas(Number(e.target.value))}
               className="mt-1 block w-16 rounded-lg border border-slate-300 px-2 py-1 text-sm"
             />
+          </label>
+          <label className="flex items-center gap-1.5 pb-1.5 text-xs text-slate-600">
+            <input type="checkbox" checked={comCabecalho} onChange={(e) => setComCabecalho(e.target.checked)} />
+            Com cabeçalho
           </label>
           <button
             type="button"

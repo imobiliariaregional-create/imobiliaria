@@ -11,6 +11,7 @@ import {
   TableRow,
   TableCell,
   WidthType,
+  VerticalAlign,
   BorderStyle,
   AlignmentType,
   HorizontalPositionAlign,
@@ -257,7 +258,15 @@ function criarDocumentoPDF(
       margin: { left: marginLeft, right: marginRight, bottom: marginBottom, top: topoConteudoPadrao },
       body: block.rows.map((row) => row.map((celula) => runsToPlainText(celula.runs))),
       theme: "grid",
-      styles: { fontSize: 9, cellPadding: 2, lineColor: [148, 163, 184], lineWidth: 0.2, textColor: COR_TEXTO_PADRAO },
+      styles: {
+        fontSize: 9,
+        cellPadding: { top: 3, right: 3.5, bottom: 3, left: 3.5 },
+        lineColor: [148, 163, 184],
+        lineWidth: 0.2,
+        textColor: COR_TEXTO_PADRAO,
+        valign: "middle",
+      },
+      columnStyles: larguraDasColunas(block, contentWidth),
       willDrawPage: () => {
         // Só redesenha o timbrado/cabeçalho quando a tabela realmente abre uma página nova —
         // redesenhar na página atual apagaria (por cima) o conteúdo que já tinha sido escrito ali.
@@ -281,6 +290,7 @@ function criarDocumentoPDF(
         if (celula.runs.length > 0 && celula.runs.every((r) => r.text.trim() === "" || r.bold)) {
           data.cell.styles.fontStyle = "bold";
         }
+        if (celula.align) data.cell.styles.halign = celula.align;
       },
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -399,6 +409,20 @@ function paragraphFromBlock(block: ParagraphBlock, opcoes?: { keepNext?: boolean
   });
 }
 
+/**
+ * Converte as larguras em % declaradas nas células (primeira linha manda) para a
+ * largura em mm que o autotable espera. Sem larguras declaradas, deixa o
+ * autotable distribuir sozinho.
+ */
+function larguraDasColunas(block: TableBlock, contentWidth: number): Record<number, { cellWidth: number }> {
+  const primeira = block.rows[0] ?? [];
+  const estilos: Record<number, { cellWidth: number }> = {};
+  primeira.forEach((celula, indice) => {
+    if (celula.width) estilos[indice] = { cellWidth: (contentWidth * celula.width) / 100 };
+  });
+  return estilos;
+}
+
 /** Quantos parágrafos finais tratar como um bloco só (tipicamente onde ficam as assinaturas), pra evitar que o Word os separe de forma feia entre páginas. */
 const PARAGRAFOS_FINAIS_UNIDOS = 4;
 
@@ -413,7 +437,15 @@ function tableFromBlock(block: TableBlock): Table {
             (celula) =>
               new TableCell({
                 shading: celula.background ? { fill: celula.background } : undefined,
-                children: [new Paragraph({ children: runsToDocxRuns(celula.runs) })],
+                width: celula.width ? { size: celula.width, type: WidthType.PERCENTAGE } : undefined,
+                verticalAlign: VerticalAlign.CENTER,
+                margins: { top: 60, bottom: 60, left: 100, right: 100 },
+                children: [
+                  new Paragraph({
+                    alignment: celula.align ? mapAlignDocx(celula.align) : undefined,
+                    children: runsToDocxRuns(celula.runs),
+                  }),
+                ],
               })
           ),
         })
