@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { PageHeader, Card, Field, Input, Table, Th, Td, EmptyState, Badge, Button, LoadingState, ErrorState, TableToolbar } from "@/components/ui";
+import { SeloAsaas } from "@/components/SeloAsaas";
 import { firstDayOfMonthISO, formatBRL, formatDate, formatMonth, lastDayOfMonthISO, todayISO } from "@/lib/format";
 import type { PagamentoMensal } from "@/lib/types";
 import { useAuth } from "@/lib/auth";
@@ -139,6 +140,9 @@ export function PagamentosListPage() {
   return (
     <div>
       <PageHeader title="Pagamentos (valores a receber pela imobiliária)" />
+      <div className="mb-4 flex items-center justify-end">
+        <SeloAsaas />
+      </div>
       <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex flex-wrap gap-2">
           {(Object.entries(statusFiltroLabel) as [StatusFiltro, string][]).map(([value, label]) => (

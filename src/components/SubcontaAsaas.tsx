@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import { Card, Field, Input, Select, Button, Badge, ErrorState } from "@/components/ui";
+import { SeloAsaas } from "@/components/SeloAsaas";
 import type { Proprietario } from "@/lib/types";
 import { criarSubconta } from "@/lib/asaas";
 
@@ -53,6 +54,7 @@ export function SubcontaAsaas({
         <p className="text-sm text-slate-600 mt-2">
           Boletos de administração com repasse pela imobiliária vão dividir o valor automaticamente pra esse proprietário.
         </p>
+        <SeloAsaas className="mt-3" />
       </Card>
     );
   }
@@ -106,9 +108,12 @@ export function SubcontaAsaas({
             </Field>
           )}
           {error && <ErrorState message={error} />}
-          <div className="flex gap-2">
-            <Button type="submit" disabled={pending}>{pending ? "Criando..." : "Criar subconta"}</Button>
-            <Button type="button" variant="secondary" onClick={() => setMostrarFormulario(false)}>Cancelar</Button>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex gap-2">
+              <Button type="submit" disabled={pending}>{pending ? "Criando..." : "Criar subconta"}</Button>
+              <Button type="button" variant="secondary" onClick={() => setMostrarFormulario(false)}>Cancelar</Button>
+            </div>
+            <SeloAsaas />
           </div>
         </form>
       )}

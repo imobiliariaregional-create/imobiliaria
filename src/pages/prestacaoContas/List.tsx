@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { PageHeader, Card, Table, Th, Td, EmptyState, Badge, Button, Field, Select, Input, LoadingState, TableToolbar } from "@/components/ui";
+import { SeloAsaas } from "@/components/SeloAsaas";
 import { formatBRL, formatMonth, todayISO } from "@/lib/format";
 import type { Proprietario, PagamentoMensal } from "@/lib/types";
 import { useAuth } from "@/lib/auth";
@@ -116,6 +117,9 @@ export function PrestacaoContasListPage() {
   return (
     <div>
       <PageHeader title="Prestação de Contas" />
+      <div className="mb-4 flex items-center justify-end">
+        <SeloAsaas />
+      </div>
       <Card className="p-4 mb-6">
         <div className="grid max-w-lg grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Proprietário" htmlFor="proprietario">

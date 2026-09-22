@@ -3,6 +3,7 @@ import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { Card, Field, Input, Button } from "@/components/ui";
+import { SeloAsaas } from "@/components/SeloAsaas";
 import { Building2, CheckCircle2, KeyRound, ShieldCheck, Sparkles } from "lucide-react";
 
 export function LoginPage() {
@@ -87,6 +88,9 @@ export function LoginPage() {
         </form>
       </Card>
           <p className="mt-5 text-center text-xs leading-5 text-slate-400">Acesso restrito a usuários autorizados.</p>
+          <div className="mt-4 flex justify-center">
+            <SeloAsaas />
+          </div>
         </div>
       </section>
     </div>
