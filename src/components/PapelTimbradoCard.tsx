@@ -50,8 +50,7 @@ export function PapelTimbradoCard() {
     <Card className="p-5 mb-6">
       <h2 className="font-medium text-slate-900 mb-1">Papel timbrado</h2>
       <p className="text-sm text-slate-500 mb-3">
-        Imagem de fundo (tamanho A4) usada ao exportar contratos em PDF e Word. O arquivo fica na pasta
-        06 - PAPEL TIMBRADO do Google Drive.
+        Imagem de fundo (tamanho A4) usada ao exportar contratos em PDF e Word. O arquivo fica guardado no sistema.
       </p>
       {papel !== "admin" ? (
         <p className="text-sm text-slate-500">Somente administradores podem alterar o papel timbrado.</p>

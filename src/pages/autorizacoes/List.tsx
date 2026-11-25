@@ -232,11 +232,11 @@ export function AutorizacoesListPage() {
       open={gerar !== null}
       titulo={gerar?.tipo === "aditivo" ? `Aditivo de inclusão de imóvel — ${gerar.item.numero ?? ""}` : `Contrato de administração — ${gerar?.item.numero ?? ""}`}
       aviso={gerar?.tipo === "aditivo"
-        ? <>Antes de gerar, edite a autorização e marque o imóvel novo. O aditivo lista <b>todos</b> os imóveis marcados. O PDF é salvo no Drive, na pasta desta autorização, e baixado; o arquivo do contrato anexado não muda.</>
+        ? <>Antes de gerar, edite a autorização e marque o imóvel novo. O aditivo lista <b>todos</b> os imóveis marcados. O PDF é salvo no sistema e baixado; o arquivo do contrato anexado não muda.</>
         : <>Usa o proprietário, os imóveis marcados, o número e a data desta autorização e a taxa do cadastro do proprietário. O PDF gerado fica anexado à autorização, pronto para enviar para assinatura.</>}
       carregarModelos={() => buscarModelosAtivos(gerar?.tipo === "aditivo" ? "aditivo_administracao" : "contrato_administracao", "administracao")}
       resolver={(conteudoModelo) => resolverContratoAdministracao(gerar!.item, conteudoModelo)}
-      rotuloSalvar={gerar?.tipo === "aditivo" ? "Salvar aditivo (PDF no Drive)" : "Salvar e anexar à autorização"}
+      rotuloSalvar={gerar?.tipo === "aditivo" ? "Salvar aditivo (PDF)" : "Salvar e anexar à autorização"}
       onSalvar={salvarDocumentoGerado}
       onClose={() => setGerar(null)}
     />
@@ -298,7 +298,7 @@ function AuthorizationForm({ value, owners, properties, onSaved }: { value?: Aut
     <div className="grid gap-4 sm:grid-cols-2"><Field label="Proprietário" htmlFor="aut_owner"><Select id="aut_owner" required disabled={Boolean(value)} value={ownerId} onChange={(e) => { setOwnerId(e.target.value); setSelected([]); }}><option value="">Selecione...</option>{owners.map((owner) => <option key={owner.id} value={owner.id}>{owner.nome}</option>)}</Select></Field><Field label="Número da autorização" htmlFor="numero"><Input id="numero" value={value?.numero ?? "GERADO AUTOMATICAMENTE AO SALVAR"} readOnly disabled={!value} /></Field></div>
     <div className="grid gap-4 sm:grid-cols-3"><Field label="Data inicial" htmlFor="aut_inicio"><Input id="aut_inicio" name="data_inicio" type="date" required defaultValue={value?.data_inicio ?? todayISO()} /></Field><Field label="Data final (opcional)" htmlFor="aut_fim"><Input id="aut_fim" name="data_fim" type="date" defaultValue={value?.data_fim ?? ""} /></Field><Field label="Status" htmlFor="aut_status"><Select id="aut_status" name="status" defaultValue={value?.status ?? "ativa"}>{Object.entries(statusLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</Select></Field></div>
     <div><p className="mb-2 text-sm font-semibold text-slate-700">Imóveis autorizados</p>{!ownerId ? <p className="text-sm text-slate-500">Selecione o proprietário.</p> : available.length === 0 ? <p className="text-sm text-slate-500">Esse proprietário ainda não possui imóveis cadastrados.</p> : <div className="max-h-44 space-y-2 overflow-y-auto rounded-xl border border-slate-200 p-3">{available.map((item) => <label key={item.id} className="flex items-start gap-2 text-sm"><input type="checkbox" checked={selected.includes(item.id)} onChange={(e) => setSelected((current) => e.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))} />{enderecoImovel(item)}</label>)}</div>}</div>
-    <Field label={value?.drive_file_id ? "Substituir contrato anexado (opcional)" : "Contrato anexado (Google Drive)"} htmlFor="arquivo"><Input id="arquivo" name="arquivo" type="file" accept=".pdf,.doc,.docx,image/*" /><p className="mt-1 text-xs text-slate-500"><FileUp size={13} className="mr-1 inline" />PDF, Word ou imagem, até 15 MB. O banco guarda somente os dados do arquivo.</p></Field>
+    <Field label={value?.drive_file_id ? "Substituir contrato anexado (opcional)" : "Contrato anexado"} htmlFor="arquivo"><Input id="arquivo" name="arquivo" type="file" accept=".pdf,.doc,.docx,image/*" /><p className="mt-1 text-xs text-slate-500"><FileUp size={13} className="mr-1 inline" />PDF, Word ou imagem, até 15 MB. O banco guarda somente os dados do arquivo.</p></Field>
     <Field label="Observações" htmlFor="aut_obs"><Textarea id="aut_obs" name="observacoes" rows={3} defaultValue={value?.observacoes ?? ""} /></Field>
     {error && <ErrorState message={error} />}<Button disabled={pending}>{pending ? "Salvando e enviando..." : "Salvar autorização"}</Button>
   </form></Card>;

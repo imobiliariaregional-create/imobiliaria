@@ -231,7 +231,7 @@ export function ContratoDetailPage() {
     }
   }
 
-  /** Cria o aditivo (o banco dá o número), troca #numero_aditivo, salva o PDF no Drive e baixa. */
+  /** Cria o aditivo (o banco dá o número), troca #numero_aditivo, salva o PDF e baixa. */
   async function salvarAditivoGerado(conteudoFinal: string, modelo: ModeloContrato) {
     if (!contrato) return;
     const tipo: TipoAditivo = /RENOVA|PRORROGA/i.test(modelo.nome) ? "prazo" : "clausulas";
@@ -259,7 +259,7 @@ export function ContratoDetailPage() {
       downloadBlob(blob, nomeArquivo);
     } catch (err) {
       await reload();
-      throw new Error(`O aditivo ${numero} foi criado, mas o PDF não foi salvo no Drive: ${err instanceof Error ? err.message : "erro desconhecido"}. Exclua o aditivo e gere de novo, ou anexe o arquivo manualmente.`);
+      throw new Error(`O aditivo ${numero} foi criado, mas o PDF não foi salvo: ${err instanceof Error ? err.message : "erro desconhecido"}. Exclua o aditivo e gere de novo, ou anexe o arquivo manualmente.`);
     }
     await reload();
   }
@@ -323,7 +323,7 @@ export function ContratoDetailPage() {
           aviso={<>O aditivo usa os dados atuais deste contrato. Na <b>renovação</b>, atualize antes, no formulário acima, a data de início, a duração e o valor do novo período. O número do aditivo (#numero_aditivo) é preenchido ao salvar.</>}
           carregarModelos={() => buscarModelosAtivos("aditivo_contrato", contrato.tipo)}
           resolver={(conteudoModelo) => resolverAditivoContrato(contrato, conteudoModelo)}
-          rotuloSalvar="Salvar aditivo (PDF no Drive)"
+          rotuloSalvar="Salvar aditivo (PDF)"
           onSalvar={salvarAditivoGerado}
           onClose={() => setModalAditivo(false)}
         />
@@ -335,7 +335,7 @@ export function ContratoDetailPage() {
               <Field label="Tipo de alteração" htmlFor="tipo_aditivo"><Select id="tipo_aditivo" name="tipo"><option value="prazo">Prazo</option><option value="valor">Valor</option><option value="clausulas">Cláusulas</option><option value="outro">Outro</option></Select></Field>
               <Field label="Título" htmlFor="titulo_aditivo"><Input id="titulo_aditivo" name="titulo" placeholder="EX.: PRORROGAÇÃO DE PRAZO" /></Field>
               <div className="sm:col-span-2"><Field label="Descrição das alterações" htmlFor="descricao_aditivo"><Textarea id="descricao_aditivo" name="descricao" rows={3} required /></Field></div>
-              <div className="sm:col-span-2"><Field label="Documento do aditivo no Google Drive (opcional)" htmlFor="arquivo_aditivo"><input id="arquivo_aditivo" name="arquivo" type="file" accept=".pdf,.doc,.docx,image/*" className="text-sm" /></Field></div>
+              <div className="sm:col-span-2"><Field label="Documento do aditivo (opcional)" htmlFor="arquivo_aditivo"><input id="arquivo_aditivo" name="arquivo" type="file" accept=".pdf,.doc,.docx,image/*" className="text-sm" /></Field></div>
               <div className="sm:col-span-2"><Button type="submit">Adicionar aditivo</Button></div>
             </form>
           )}
@@ -427,7 +427,7 @@ export function ContratoDetailPage() {
                 </Field>
               </div>
               <div className="col-span-2">
-                <Field label="Arquivo no Google Drive (PDF/imagem, opcional)" htmlFor="arquivo_laudo">
+                <Field label="Arquivo (PDF/imagem, opcional)" htmlFor="arquivo_laudo">
                   <input type="file" id="arquivo_laudo" name="arquivo" accept=".pdf,image/*" className="text-sm" />
                 </Field>
               </div>

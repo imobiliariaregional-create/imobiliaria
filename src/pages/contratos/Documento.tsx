@@ -491,7 +491,7 @@ export function ContratoDocumentoPage() {
                 </Button>
                 {gerado.drive_file_id && gerado.drive_file_name && (
                   <Button type="button" variant="secondary" onClick={() => downloadDriveFile(gerado.drive_file_id!, gerado.drive_file_name!, gerado.drive_mime_type)}>
-                    Baixar arquivo salvo no Drive
+                    Baixar arquivo salvo
                   </Button>
                 )}
               </>

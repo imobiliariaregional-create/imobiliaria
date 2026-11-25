@@ -6,7 +6,7 @@ import type { ModeloContrato } from "@/lib/types";
 
 /**
  * Escolhe um modelo, monta o texto com os códigos já trocados (resolver) e deixa
- * revisar antes de salvar. Quem chama decide o que "salvar" faz (PDF no Drive,
+ * revisar antes de salvar. Quem chama decide o que "salvar" faz (PDF salvo no sistema,
  * registro de aditivo etc.).
  */
 export function GerarDocumentoModal({

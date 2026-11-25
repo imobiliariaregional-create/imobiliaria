@@ -135,7 +135,7 @@ export function NovaNotaFiscalPage() {
           <Field label="Descrição" htmlFor="descricao">
             <Textarea id="descricao" name="descricao" rows={3} />
           </Field>
-          <Field label="Arquivo no Google Drive (PDF/imagem, opcional)" htmlFor="arquivo">
+          <Field label="Arquivo (PDF/imagem, opcional)" htmlFor="arquivo">
             <input type="file" id="arquivo" name="arquivo" accept=".pdf,image/*" className="text-sm" />
           </Field>
           {error && <ErrorState message={error} />}

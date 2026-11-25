@@ -103,7 +103,7 @@ export function NotasFiscaisListPage() {
                   <Td>
                     {nota.drive_file_id && nota.drive_file_name ? (
                       <button type="button" onClick={() => downloadDriveFile(nota.drive_file_id!, nota.drive_file_name!, nota.drive_mime_type)} className="text-brand-700 hover:underline">
-                        baixar do Drive
+                        baixar arquivo
                       </button>
                     ) : urls[nota.id] ? (
                       <a href={urls[nota.id]} target="_blank" rel="noreferrer" className="text-brand-700 hover:underline">

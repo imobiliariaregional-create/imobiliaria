@@ -9,7 +9,10 @@ const PATH = "timbrado.png";
 export async function getLetterheadUrl(): Promise<string | null> {
   const config = await getConfig();
   if (config?.papel_timbrado_drive_file_id) {
-    return URL.createObjectURL(await getDriveFileBlob(config.papel_timbrado_drive_file_id, config.papel_timbrado_drive_mime_type));
+    // Papel timbrado antigo no Google Drive que não pode mais ser lido: trata como
+    // "nenhum enviado", para a tela pedir um novo envio.
+    const blob = await getDriveFileBlob(config.papel_timbrado_drive_file_id, config.papel_timbrado_drive_mime_type).catch(() => null);
+    return blob ? URL.createObjectURL(blob) : null;
   }
   // Compatibilidade temporária com o papel timbrado enviado antes da migração para o Drive.
   const { data } = await supabase.storage.from(BUCKET).list("", { search: PATH });
@@ -28,8 +31,8 @@ export async function uploadLetterhead(file: File): Promise<void> {
     papel_timbrado_drive_file_size: Number(uploaded.size),
     updated_at: new Date().toISOString(),
   }).eq("id", true);
-  if (error) { await deleteDriveFile(uploaded.id, "papel_timbrado"); throw new Error(error.message); }
-  if (previous?.papel_timbrado_drive_file_id) await deleteDriveFile(previous.papel_timbrado_drive_file_id, "papel_timbrado");
+  if (error) { await deleteDriveFile(uploaded.id, "papel_timbrado").catch(() => undefined); throw new Error(error.message); }
+  if (previous?.papel_timbrado_drive_file_id) await deleteDriveFile(previous.papel_timbrado_drive_file_id, "papel_timbrado").catch(() => undefined);
 }
 
 export async function removeLetterhead(): Promise<void> {
@@ -47,8 +50,11 @@ export async function removeLetterhead(): Promise<void> {
 export async function fetchLetterheadDataUrl(): Promise<string | null> {
   const config = await getConfig();
   let blob: Blob;
-  if (config?.papel_timbrado_drive_file_id) blob = await getDriveFileBlob(config.papel_timbrado_drive_file_id, config.papel_timbrado_drive_mime_type);
-  else {
+  if (config?.papel_timbrado_drive_file_id) {
+    blob = await getDriveFileBlob(config.papel_timbrado_drive_file_id, config.papel_timbrado_drive_mime_type).catch(() => {
+      throw new Error("O papel timbrado estava no Google Drive e não pode mais ser lido. Envie a imagem do papel timbrado de novo em Modelos de Contrato.");
+    });
+  } else {
     const url = await getLetterheadUrl();
     if (!url) return null;
     const res = await fetch(url);
