@@ -3,6 +3,7 @@ import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, ProtectedRoute } from "@/lib/auth";
 import { AppLayout } from "@/components/AppLayout";
 import { LoginPage } from "@/pages/Login";
+import { EsqueciSenhaPage, RedefinirSenhaPage } from "@/pages/RecuperarSenha";
 import { DashboardPage } from "@/pages/Dashboard";
 import { ProprietariosListPage } from "@/pages/proprietarios/List";
 import { NovoProprietarioPage } from "@/pages/proprietarios/New";
@@ -36,6 +37,8 @@ export function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/esqueci-senha" element={<EsqueciSenhaPage />} />
+          <Route path="/redefinir-senha" element={<RedefinirSenhaPage />} />
 
           <Route
             element={

@@ -44,8 +44,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // O Supabase revalida a sessão sempre que a aba volta a ficar visível, disparando este
     // evento mesmo sem nada ter mudado — só recarrega o perfil se o usuário realmente mudou,
     // pra não mostrar "Carregando..." de novo toda vez que o usuário troca de aba e volta.
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: subscription } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);
+      // Se o link de recuperação cair na página inicial (Redirect URL não liberada no Supabase),
+      // leva o usuário mesmo assim para a tela de criar nova senha.
+      if (event === "PASSWORD_RECOVERY" && !window.location.hash.startsWith("#/redefinir-senha")) {
+        window.location.hash = "#/redefinir-senha";
+      }
       if (newSession?.user.id === currentUserId) return;
       currentUserId = newSession?.user.id;
       void loadPerfil(currentUserId);

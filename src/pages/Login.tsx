@@ -1,5 +1,5 @@
 import { FormEvent, useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { Card, Field, Input, Button } from "@/components/ui";
@@ -79,6 +79,9 @@ export function LoginPage() {
           <Field label="Senha" htmlFor="password">
                 <Input id="password" name="password" type="password" required autoComplete="current-password" placeholder="Digite sua senha" />
           </Field>
+              <div className="-mt-2 text-right">
+                <Link to="/esqueci-senha" className="text-sm font-medium text-brand-700 hover:underline">Esqueci minha senha</Link>
+              </div>
 
               {error && <p className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-sm font-medium text-red-700">{error}</p>}
 
