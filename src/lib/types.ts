@@ -46,6 +46,7 @@ export interface Proprietario {
   estado_civil: EstadoCivil | null;
   profissao: string | null;
   asaas_wallet_id: string | null;
+  taxa_administracao: number;
   created_at: string;
 }
 
@@ -184,11 +185,16 @@ export interface NotaFiscal {
   contratos?: Contrato | null;
 }
 
+export type CategoriaModelo = "contrato" | "contrato_administracao" | "aditivo_contrato" | "aditivo_administracao";
+
 export interface ModeloContrato {
   id: string;
   nome: string;
   tipo_operacao: TipoOperacao;
+  categoria: CategoriaModelo;
   conteudo: string;
+  arquivado: boolean;
+  arquivado_em: string | null;
   created_at: string;
 }
 
@@ -237,6 +243,15 @@ export interface ConfiguracaoDocumentos {
   papel_timbrado_drive_file_name: string | null;
   papel_timbrado_drive_mime_type: string | null;
   papel_timbrado_drive_file_size: number | null;
+  adm_razao_social: string | null;
+  adm_cnpj: string | null;
+  adm_creci: string | null;
+  adm_endereco: string | null;
+  adm_email: string | null;
+  adm_telefone: string | null;
+  adm_representante_nome: string | null;
+  adm_representante_cpf: string | null;
+  adm_representante_cargo: string | null;
   updated_at: string;
 }
 

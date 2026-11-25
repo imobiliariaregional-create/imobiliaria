@@ -10,6 +10,12 @@ import { confirmDeletion } from "@/lib/actions";
 import { useAuth } from "@/lib/auth";
 import { upperOrNull, useFormDraft } from "@/lib/forms";
 import { deleteDriveFile, downloadDriveFile, uploadDriveFile } from "@/lib/googleDrive";
+import { GerarDocumentoModal } from "@/components/GerarDocumentoModal";
+import { buscarModelosAtivos } from "@/lib/administradora";
+import { gerarPdfDocumento, resolverAditivoContrato } from "@/lib/documentosModelo";
+import { substituirPlaceholders } from "@/lib/placeholders";
+import { downloadBlob } from "@/lib/exportContrato";
+import type { ModeloContrato } from "@/lib/types";
 
 const tipoLabel: Record<string, string> = {
   aluguel: "Aluguel",
@@ -32,6 +38,7 @@ export function ContratoDetailPage() {
   const [notaUrls, setNotaUrls] = useState<Record<string, string>>({});
   const laudoDraft = useFormDraft(`laudo:${id ?? "novo"}`);
   const aditivoDraft = useFormDraft(`aditivo:${id ?? "novo"}`);
+  const [modalAditivo, setModalAditivo] = useState(false);
 
   async function reload() {
     const [contratoRes, pagamentosRes, laudosRes, notasRes, pessoasRes, aditivosRes] = await Promise.all([
@@ -224,6 +231,39 @@ export function ContratoDetailPage() {
     }
   }
 
+  /** Cria o aditivo (o banco dá o número), troca #numero_aditivo, salva o PDF no Drive e baixa. */
+  async function salvarAditivoGerado(conteudoFinal: string, modelo: ModeloContrato) {
+    if (!contrato) return;
+    const tipo: TipoAditivo = /RENOVA|PRORROGA/i.test(modelo.nome) ? "prazo" : "clausulas";
+    const { data: criado, error } = await supabase
+      .from("aditivos_contratuais")
+      .insert({ contrato_id: id, data: todayISO(), tipo, titulo: modelo.nome, descricao: `GERADO PELO MODELO "${modelo.nome}"` })
+      .select("*")
+      .single<AditivoContratual>();
+    if (error) throw new Error(error.message);
+
+    const numero = criado.numero ?? "";
+    const conteudo = substituirPlaceholders(conteudoFinal, { numero_aditivo: numero });
+    const nomeArquivo = `${numero.replace("/", "-")} - ${modelo.nome}.pdf`;
+    try {
+      const blob = await gerarPdfDocumento(conteudo, { numeroContrato: numero, data: criado.data, tipoImovel: contrato.imoveis?.tipo_imovel ?? null });
+      const uploaded = await uploadDriveFile(new File([blob], nomeArquivo, { type: "application/pdf" }), {
+        category: "aditivo",
+        folders: [criado.data.slice(0, 4), `${contrato.numero_contrato ?? "SEM NUMERO"} - ${contrato.imoveis ? enderecoImovel(contrato.imoveis) : "IMOVEL"}`],
+        fileName: nomeArquivo,
+      });
+      const { error: updateError } = await supabase.from("aditivos_contratuais").update({
+        drive_file_id: uploaded.id, drive_file_name: uploaded.name, drive_mime_type: uploaded.mimeType, drive_file_size: Number(uploaded.size),
+      }).eq("id", criado.id);
+      if (updateError) throw new Error(updateError.message);
+      downloadBlob(blob, nomeArquivo);
+    } catch (err) {
+      await reload();
+      throw new Error(`O aditivo ${numero} foi criado, mas o PDF não foi salvo no Drive: ${err instanceof Error ? err.message : "erro desconhecido"}. Exclua o aditivo e gere de novo, ou anexe o arquivo manualmente.`);
+    }
+    await reload();
+  }
+
   async function excluirAditivo(aditivo: AditivoContratual) {
     if (!confirmDeletion(`Excluir o aditivo ${aditivo.numero ?? "selecionado"}?`)) return;
     const { error } = await supabase.from("aditivos_contratuais").delete().eq("id", aditivo.id);
@@ -271,7 +311,22 @@ export function ContratoDetailPage() {
       </div>
 
       <div>
-        <h2 className="font-medium text-slate-900 mb-3">Aditivos contratuais</h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-medium text-slate-900">Aditivos contratuais</h2>
+          {(papel === "admin" || papel === "corretor") && (
+            <Button type="button" variant="secondary" onClick={() => setModalAditivo(true)}>Gerar aditivo pelo modelo</Button>
+          )}
+        </div>
+        <GerarDocumentoModal
+          open={modalAditivo}
+          titulo="Gerar aditivo pelo modelo"
+          aviso={<>O aditivo usa os dados atuais deste contrato. Na <b>renovação</b>, atualize antes, no formulário acima, a data de início, a duração e o valor do novo período. O número do aditivo (#numero_aditivo) é preenchido ao salvar.</>}
+          carregarModelos={() => buscarModelosAtivos("aditivo_contrato", contrato.tipo)}
+          resolver={(conteudoModelo) => resolverAditivoContrato(contrato, conteudoModelo)}
+          rotuloSalvar="Salvar aditivo (PDF no Drive)"
+          onSalvar={salvarAditivoGerado}
+          onClose={() => setModalAditivo(false)}
+        />
         <Card className="p-4">
           {(papel === "admin" || papel === "corretor") && (
             <form ref={aditivoDraft.formRef} onSubmit={handleCriarAditivo} onInput={aditivoDraft.saveDraft} onChange={aditivoDraft.saveDraft} className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">

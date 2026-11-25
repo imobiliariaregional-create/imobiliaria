@@ -2,12 +2,19 @@ import { FormEvent, useState } from "react";
 import { Card, Field, Input, Select, Button, ErrorState } from "@/components/ui";
 import { RichTextEditor } from "@/components/RichTextEditor";
 import { PLACEHOLDERS } from "@/lib/placeholders";
-import type { ModeloContrato } from "@/lib/types";
+import type { CategoriaModelo, ModeloContrato } from "@/lib/types";
 import { upper, useFormDraft } from "@/lib/forms";
 
-export type ModeloContratoPayload = Omit<ModeloContrato, "id" | "created_at">;
+export type ModeloContratoPayload = Omit<ModeloContrato, "id" | "created_at" | "arquivado" | "arquivado_em">;
 
-const categorias = ["Proprietário", "Inquilino/Comprador", "Imóvel", "Contrato"] as const;
+const categorias = ["Proprietário", "Inquilino/Comprador", "Imóvel", "Contrato", "Administradora", "Administração"] as const;
+
+export const CATEGORIA_MODELO_LABEL: Record<CategoriaModelo, string> = {
+  contrato: "Contrato de locação/venda",
+  contrato_administracao: "Contrato de administração",
+  aditivo_contrato: "Aditivo de contrato",
+  aditivo_administracao: "Aditivo do contrato de administração",
+};
 
 export function ModeloContratoForm({
   onSubmit,
@@ -37,6 +44,7 @@ export function ModeloContratoForm({
       await onSubmit({
         nome: upper(formData.get("nome")),
         tipo_operacao: String(formData.get("tipo_operacao") ?? "aluguel") as ModeloContrato["tipo_operacao"],
+        categoria: String(formData.get("categoria") ?? "contrato") as CategoriaModelo,
         conteudo,
       });
       clearDraft();
@@ -60,6 +68,13 @@ export function ModeloContratoForm({
               <option value="aluguel">Aluguel</option>
               <option value="administracao">Administração</option>
               <option value="venda">Venda</option>
+            </Select>
+          </Field>
+          <Field label="Categoria" htmlFor="categoria">
+            <Select id="categoria" name="categoria" defaultValue={defaultValues?.categoria ?? "contrato"}>
+              {Object.entries(CATEGORIA_MODELO_LABEL).map(([valor, rotulo]) => (
+                <option key={valor} value={valor}>{rotulo}</option>
+              ))}
             </Select>
           </Field>
 

@@ -14,6 +14,39 @@ import { deleteDriveFile, downloadDriveFile, getDriveFileBlob, uploadDriveFile, 
 import { confirmDeletion } from "@/lib/actions";
 import type { Contrato, ContratoGerado, ModeloContrato } from "@/lib/types";
 import type { CabecalhoDocumento } from "@/lib/contratoDocumento";
+import {
+  buscarAutorizacaoDoImovel,
+  buscarDadosAdministradora,
+  camposAdministradoraFaltando,
+  usaContratoAdministracao,
+  usaDadosAdministradora,
+  type DadosAdministradora,
+} from "@/lib/administradora";
+import type { AutorizacaoAdministracao } from "@/lib/types";
+
+/**
+ * Busca o que o modelo precisa sobre a ADMINISTRADORA e avisa antes de gerar
+ * um contrato com campos em branco.
+ */
+async function carregarDadosAdministracao(conteudoModelo: string, imovelId: string) {
+  let administradora: DadosAdministradora | null = null;
+  let autorizacao: AutorizacaoAdministracao | null = null;
+
+  if (usaDadosAdministradora(conteudoModelo)) {
+    administradora = await buscarDadosAdministradora();
+    const faltando = camposAdministradoraFaltando(administradora);
+    if (faltando.length > 0) {
+      throw new Error(`Preencha os Dados da imobiliária em Modelos de Contrato antes de gerar este documento. Faltam: ${faltando.join(", ")}.`);
+    }
+  }
+  if (usaContratoAdministracao(conteudoModelo)) {
+    autorizacao = await buscarAutorizacaoDoImovel(imovelId);
+    if (!autorizacao) {
+      throw new Error("Este imóvel não está em nenhum contrato de administração ativo. Cadastre-o em Autorizações de administração (com o proprietário e o imóvel) antes de gerar.");
+    }
+  }
+  return { administradora, autorizacao };
+}
 
 export function ContratoDocumentoPage() {
   const { id } = useParams<{ id: string }>();
@@ -33,6 +66,9 @@ export function ContratoDocumentoPage() {
   const [emailProprietario, setEmailProprietario] = useState("");
   const [emailPessoa, setEmailPessoa] = useState("");
   const [erroModalAssinatura, setErroModalAssinatura] = useState<string | null>(null);
+  const [nomePrimeiroAssinante, setNomePrimeiroAssinante] = useState("");
+  // Documento gerado de modelo com a ADMINISTRADORA: quem assina pelo locador é a imobiliária.
+  const assinaComoAdministradora = contrato?.tipo === "administracao" && /ADMINISTRADORA/.test(conteudo);
 
   async function reload() {
     setError(null);
@@ -54,6 +90,8 @@ export function ContratoDocumentoPage() {
         .from("modelos_contrato")
         .select("*")
         .eq("tipo_operacao", contratoRes.data.tipo)
+        .eq("categoria", "contrato")
+        .eq("arquivado", false)
         .order("nome")
         .returns<ModeloContrato[]>();
       setModelos(modelosData ?? []);
@@ -76,11 +114,15 @@ export function ContratoDocumentoPage() {
       const proprietario = contrato.imoveis?.proprietarios;
       if (!proprietario) throw new Error("O imóvel deste contrato não tem proprietário cadastrado.");
 
+      const { administradora, autorizacao } = await carregarDadosAdministracao(modelo.conteudo, contrato.imovel_id);
+
       const valores = resolverPlaceholders({
         contrato,
         imovel: contrato.imoveis!,
         proprietario,
         pessoa: contrato.pessoas ?? null,
+        administradora,
+        autorizacao,
       });
       const conteudoGerado = substituirPlaceholders(modelo.conteudo, valores);
 
@@ -177,18 +219,31 @@ export function ContratoDocumentoPage() {
     }
   }
 
-  function abrirModalAssinatura() {
+  async function abrirModalAssinatura() {
     if (!contrato) return;
-    setEmailProprietario(contrato.imoveis?.proprietarios?.email ?? "");
-    setEmailPessoa(contrato.pessoas?.email ?? "");
     setErroModalAssinatura(null);
+    setEmailPessoa(contrato.pessoas?.email ?? "");
+    if (assinaComoAdministradora) {
+      // Na locação administrada o proprietário não assina: a imobiliária assina por si e como procuradora.
+      try {
+        const adm = await buscarDadosAdministradora();
+        setNomePrimeiroAssinante(adm?.adm_razao_social ?? "Imobiliária");
+        setEmailProprietario(adm?.adm_email ?? "");
+      } catch {
+        setNomePrimeiroAssinante("Imobiliária");
+        setEmailProprietario("");
+      }
+    } else {
+      setNomePrimeiroAssinante(contrato.imoveis?.proprietarios?.nome ?? "");
+      setEmailProprietario(contrato.imoveis?.proprietarios?.email ?? "");
+    }
     setModalAssinatura(true);
   }
 
   function confirmarEnviarAssinatura() {
     const emailValido = (valor: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor.trim());
     if (!emailValido(emailProprietario)) {
-      setErroModalAssinatura("Informe um e-mail válido para o proprietário.");
+      setErroModalAssinatura(`Informe um e-mail válido para ${assinaComoAdministradora ? "a imobiliária" : "o proprietário"}.`);
       return;
     }
     if (!emailValido(emailPessoa)) {
@@ -221,7 +276,7 @@ export function ContratoDocumentoPage() {
       const fileName = `contrato${contrato.numero_contrato ? "-" + contrato.numero_contrato.replace("/", "-") : ""}.pdf`;
 
       const resultado = await enviarParaAssinatura(pdfBase64, fileName, [
-        { nome: proprietario.nome, email: emailProprietario.trim() },
+        { nome: assinaComoAdministradora ? nomePrimeiroAssinante || "Imobiliária" : proprietario.nome, email: emailProprietario.trim() },
         { nome: pessoa.nome, email: emailPessoa.trim() },
       ]);
 
@@ -489,7 +544,15 @@ export function ContratoDocumentoPage() {
               <p className="text-sm text-slate-500">
                 Confira os e-mails que vão receber o documento para assinatura. Você pode alterá-los antes de enviar.
               </p>
-              <Field label={`Proprietário — ${contrato.imoveis?.proprietarios?.nome ?? ""}`} htmlFor="email_proprietario_assinatura">
+              {assinaComoAdministradora && (
+                <p className="text-sm text-slate-500">
+                  Locação administrada: assina a imobiliária, por si e como procuradora do proprietário. O proprietário não recebe o documento.
+                </p>
+              )}
+              <Field
+                label={`${assinaComoAdministradora ? "Imobiliária (administradora)" : "Proprietário"} — ${nomePrimeiroAssinante}`}
+                htmlFor="email_proprietario_assinatura"
+              >
                 <Input
                   id="email_proprietario_assinatura"
                   type="email"

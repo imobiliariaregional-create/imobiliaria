@@ -68,6 +68,8 @@ export function ContratoForm({
   const imovelSelecionado = imoveis.find((i) => i.id === imovelId) ?? imovelFixo;
   const tipo = mode === "edit" ? defaultValues?.tipo : imovelSelecionado?.tipo_operacao;
   const bloqueado = mode === "edit";
+  // Taxa do cadastro do proprietário do imóvel, usada como valor inicial na locação de administração.
+  const taxaPadraoProprietario = proprietarios.find((p) => p.id === imovelSelecionado?.proprietario_id)?.taxa_administracao;
 
   const valorTotalEstimado = useMemo(() => {
     const v = valorAluguel ?? 0;
@@ -237,7 +239,17 @@ export function ContratoForm({
             {tipo === "administracao" && (
               <div className="grid grid-cols-1 gap-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 sm:grid-cols-2">
                 <Field label="Comissão da imobiliária (%)" htmlFor="percentual_administracao">
-                  <Input id="percentual_administracao" name="percentual_administracao" type="number" step="0.01" min="0.01" max="100" required defaultValue={defaultValues?.percentual_administracao ?? 10} />
+                  <Input
+                    key={mode === "create" ? imovelId : "edit"}
+                    id="percentual_administracao"
+                    name="percentual_administracao"
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    max="100"
+                    required
+                    defaultValue={defaultValues?.percentual_administracao ?? taxaPadraoProprietario ?? 10}
+                  />
                 </Field>
                 <Field label="Quem recebe o aluguel do inquilino?" htmlFor="recebimento_aluguel">
                   <Select id="recebimento_aluguel" name="recebimento_aluguel" value={recebimentoAluguel} onChange={(event) => setRecebimentoAluguel(event.target.value as Contrato["recebimento_aluguel"] & string)}>

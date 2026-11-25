@@ -62,6 +62,7 @@ export function ProprietarioForm({
         representante_nome: tipoPessoa === "juridica" ? upperOrNull(formData.get("representante_nome")) : null,
         representante_cpf: tipoPessoa === "juridica" ? (formData.get("representante_cpf") as string) || null : null,
         representante_rg: tipoPessoa === "juridica" ? upperOrNull(formData.get("representante_rg")) : null,
+        taxa_administracao: Number(formData.get("taxa_administracao")) || 10,
       });
       clearDraft();
     } catch (err) {
@@ -173,6 +174,11 @@ export function ProprietarioForm({
             </Field>
           </div>
         </div>
+
+        <Field label="Taxa de administração (%)" htmlFor="taxa_administracao">
+          <Input id="taxa_administracao" name="taxa_administracao" type="number" step="0.01" min="0.01" max="100" required defaultValue={defaultValues?.taxa_administracao ?? 10} />
+          <p className="mt-1 text-xs text-slate-500">Vai para o contrato de administração e já vem preenchida nas locações de administração dos imóveis deste proprietário.</p>
+        </Field>
 
         <Field label="Observações" htmlFor="observacoes">
           <Textarea id="observacoes" name="observacoes" rows={3} defaultValue={defaultValues?.observacoes ?? ""} />

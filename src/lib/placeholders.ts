@@ -1,11 +1,12 @@
 import { formatBRL, formatDate, todayISO } from "@/lib/format";
 import { numeroPorExtenso, valorPorExtensoBRL, dataPorExtenso } from "@/lib/extenso";
-import type { Contrato, Imovel, Proprietario, Pessoa } from "@/lib/types";
+import type { AutorizacaoAdministracao, Contrato, Imovel, Proprietario, Pessoa } from "@/lib/types";
+import type { DadosAdministradora } from "@/lib/administradora";
 
 export interface PlaceholderInfo {
   codigo: string;
   descricao: string;
-  categoria: "Proprietário" | "Inquilino/Comprador" | "Imóvel" | "Contrato";
+  categoria: "Proprietário" | "Inquilino/Comprador" | "Imóvel" | "Contrato" | "Administradora" | "Administração";
 }
 
 export interface DadosResolucao {
@@ -13,6 +14,8 @@ export interface DadosResolucao {
   imovel: Imovel;
   proprietario: Proprietario;
   pessoa: Pessoa | null;
+  administradora?: DadosAdministradora | null;
+  autorizacao?: AutorizacaoAdministracao | null;
 }
 
 function enderecoCompletoImovel(imovel: Imovel): string {
@@ -49,10 +52,7 @@ function numeroContratoExtenso(numero: string): string {
 }
 
 /** Monta o dicionário código -> valor com todos os placeholders (incluindo aliases por papel contratual). */
-export function resolverPlaceholders({ contrato, imovel, proprietario, pessoa }: DadosResolucao): Record<string, string> {
-  const hoje = todayISO();
-  const v: Record<string, string> = {};
-
+function adicionarProprietario(v: Record<string, string>, proprietario: Proprietario) {
   // ===== Proprietário =====
   v.nome_proprietario = proprietario.nome ?? "";
   v.cpf_cnpj_proprietario = proprietario.cpf_cnpj ?? "";
@@ -96,6 +96,79 @@ export function resolverPlaceholders({ contrato, imovel, proprietario, pessoa }:
     v[`profissao_${alias}`] = v.profissao_proprietario;
     v[`qualificacao_${alias}`] = v.qualificacao_proprietario;
   }
+
+}
+
+function percentualTexto(percentual: number | null | undefined) {
+  if (percentual == null) return { texto: "", extenso: "" };
+  const texto = `${String(percentual).replace(".", ",")}%`;
+  const extenso = Number.isInteger(percentual) ? `${numeroPorExtenso(percentual)} por cento` : `${texto.replace("%", "")} por cento`;
+  return { texto, extenso };
+}
+
+/** #..._administradora: dados da imobiliária cadastrados em Modelos de Contrato → Dados da imobiliária. */
+function adicionarAdministradora(v: Record<string, string>, adm: DadosAdministradora | null) {
+  v.nome_administradora = adm?.adm_razao_social ?? "";
+  v.cnpj_administradora = adm?.adm_cnpj ?? "";
+  v.creci_administradora = adm?.adm_creci ?? "";
+  v.endereco_administradora = adm?.adm_endereco ?? "";
+  v.email_administradora = adm?.adm_email ?? "";
+  v.telefone_administradora = adm?.adm_telefone ?? "";
+  v.representante_administradora = adm?.adm_representante_nome ?? "";
+  v.cpf_representante_administradora = adm?.adm_representante_cpf ?? "";
+  v.cargo_representante_administradora = adm?.adm_representante_cargo ?? "";
+}
+
+/** Número, data e taxa do contrato de administração (autorização) do proprietário. */
+function adicionarContratoAdministracao(
+  v: Record<string, string>,
+  autorizacao: AutorizacaoAdministracao | null,
+  taxa: number | null | undefined,
+) {
+  v.numero_contrato_administracao = autorizacao?.numero ?? "";
+  v.data_contrato_administracao = autorizacao ? formatDate(autorizacao.data_inicio) : "";
+  v.data_contrato_administracao_extenso = autorizacao ? dataPorExtenso(autorizacao.data_inicio) : "";
+  const { texto, extenso } = percentualTexto(taxa);
+  v.taxa_administracao = texto;
+  v.taxa_administracao_extenso = extenso;
+}
+
+function listaImoveis(imoveis: Imovel[]) {
+  const letras = "abcdefghijklmnopqrstuvwxyz";
+  return imoveis
+    .map((imovel, i) => `${letras[i] ?? i + 1}) ${enderecoCompletoImovel(imovel)} (${imovel.tipo_imovel === "comercial" ? "comercial" : "residencial"})`)
+    .join("; ");
+}
+
+/** Dicionário para o contrato de administração e seus aditivos (proprietário × imobiliária). */
+export function resolverPlaceholdersAdministracao({
+  proprietario,
+  imoveis,
+  autorizacao,
+  administradora,
+}: {
+  proprietario: Proprietario;
+  imoveis: Imovel[];
+  autorizacao: AutorizacaoAdministracao;
+  administradora: DadosAdministradora | null;
+}): Record<string, string> {
+  const hoje = todayISO();
+  const v: Record<string, string> = {};
+  adicionarProprietario(v, proprietario);
+  adicionarAdministradora(v, administradora);
+  adicionarContratoAdministracao(v, autorizacao, proprietario.taxa_administracao);
+  v.imoveis_administrados = listaImoveis(imoveis);
+  v.data_hoje = formatDate(hoje);
+  v.data_hoje_extenso = dataPorExtenso(hoje);
+  return v;
+}
+
+export function resolverPlaceholders({ contrato, imovel, proprietario, pessoa, administradora = null, autorizacao = null }: DadosResolucao): Record<string, string> {
+  const hoje = todayISO();
+  const v: Record<string, string> = {};
+  adicionarProprietario(v, proprietario);
+  adicionarAdministradora(v, administradora);
+  adicionarContratoAdministracao(v, autorizacao, contrato.percentual_administracao);
 
   // ===== Inquilino/Comprador =====
   v.nome_pessoa = pessoa?.nome ?? "";
@@ -263,4 +336,22 @@ export const PLACEHOLDERS: PlaceholderInfo[] = [
   { codigo: "#tipo_operacao", descricao: "\"Aluguel\", \"Administração\" ou \"Venda\"", categoria: "Contrato" },
   { codigo: "#data_hoje", descricao: "Data de hoje (geração do documento)", categoria: "Contrato" },
   { codigo: "#data_hoje_extenso", descricao: "Data de hoje por extenso", categoria: "Contrato" },
+  { codigo: "#numero_aditivo", descricao: "Número do aditivo (ex: ADT-0001/2026). Só em modelos de aditivo; é preenchido ao salvar o aditivo", categoria: "Contrato" },
+
+  { codigo: "#nome_administradora", descricao: "Razão social da imobiliária (Dados da imobiliária)", categoria: "Administradora" },
+  { codigo: "#cnpj_administradora", descricao: "CNPJ da imobiliária", categoria: "Administradora" },
+  { codigo: "#creci_administradora", descricao: "CRECI da imobiliária", categoria: "Administradora" },
+  { codigo: "#endereco_administradora", descricao: "Endereço da sede", categoria: "Administradora" },
+  { codigo: "#email_administradora", descricao: "E-mail da imobiliária", categoria: "Administradora" },
+  { codigo: "#telefone_administradora", descricao: "Telefone da imobiliária", categoria: "Administradora" },
+  { codigo: "#representante_administradora", descricao: "Nome do representante legal que assina pela imobiliária", categoria: "Administradora" },
+  { codigo: "#cpf_representante_administradora", descricao: "CPF do representante legal", categoria: "Administradora" },
+  { codigo: "#cargo_representante_administradora", descricao: "Cargo do representante (ex: sócio-administrador)", categoria: "Administradora" },
+
+  { codigo: "#numero_contrato_administracao", descricao: "Número do contrato de administração (autorização ativa do imóvel ou do proprietário, ex: AUT-0001/2026)", categoria: "Administração" },
+  { codigo: "#data_contrato_administracao", descricao: "Data de início do contrato de administração", categoria: "Administração" },
+  { codigo: "#data_contrato_administracao_extenso", descricao: "Data do contrato de administração por extenso", categoria: "Administração" },
+  { codigo: "#taxa_administracao", descricao: "Taxa de administração (ex: 10%). Na locação vem do contrato; no contrato de administração, do cadastro do proprietário", categoria: "Administração" },
+  { codigo: "#taxa_administracao_extenso", descricao: "Taxa de administração por extenso (ex: dez por cento)", categoria: "Administração" },
+  { codigo: "#imoveis_administrados", descricao: "Lista dos imóveis do contrato de administração (só no contrato de administração e seus aditivos)", categoria: "Administração" },
 ];

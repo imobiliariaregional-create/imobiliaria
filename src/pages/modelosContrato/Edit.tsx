@@ -24,9 +24,12 @@ export function EditarModeloContratoPage() {
   }
 
   async function handleDelete() {
-    if (!confirmDeletion("Excluir este modelo de contrato?")) return;
+    if (!confirmDeletion("Excluir definitivamente este modelo de contrato? Os documentos já gerados com ele continuam salvos.")) return;
     const { error } = await supabase.from("modelos_contrato").delete().eq("id", id);
-    if (error) throw new Error(error.message);
+    if (error) {
+      alert(error.message);
+      return;
+    }
     navigate("/modelos-contrato");
   }
 

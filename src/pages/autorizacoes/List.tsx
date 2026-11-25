@@ -10,7 +10,12 @@ import { deleteDriveFile, downloadDriveFile, getDriveFileBlob, uploadDriveFile }
 import { enviarParaAssinatura, consultarStatusAssinatura, baixarDocumentoAssinado, blobParaBase64, STATUS_LABEL } from "@/lib/assinafy";
 import { confirmDeletion } from "@/lib/actions";
 import { useAuth } from "@/lib/auth";
-import { Download, FileUp, PenLine, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Download, FilePlus2, FileText, FileUp, PenLine, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { GerarDocumentoModal } from "@/components/GerarDocumentoModal";
+import { buscarDadosAdministradora, buscarModelosAtivos } from "@/lib/administradora";
+import { gerarPdfDocumento, resolverContratoAdministracao } from "@/lib/documentosModelo";
+import { downloadBlob } from "@/lib/exportContrato";
+import type { ModeloContrato } from "@/lib/types";
 
 const statusLabels: Record<StatusAutorizacao, string> = { ativa: "Ativa", encerrada: "Encerrada", cancelada: "Cancelada" };
 
@@ -28,6 +33,9 @@ export function AutorizacoesListPage() {
   const [emailAssinatura, setEmailAssinatura] = useState("");
   const [erroAssinatura, setErroAssinatura] = useState<string | null>(null);
   const [assinaturaPendingId, setAssinaturaPendingId] = useState<string | null>(null);
+  const [emailAdministradora, setEmailAdministradora] = useState("");
+  const [nomeAdministradora, setNomeAdministradora] = useState("");
+  const [gerar, setGerar] = useState<{ item: AutorizacaoAdministracao; tipo: "contrato" | "aditivo" } | null>(null);
 
   async function reload() {
     const [{ data: rows }, { data: owners }, { data: properties }] = await Promise.all([
@@ -62,17 +70,30 @@ export function AutorizacoesListPage() {
     finally { setPendingDownload(null); }
   }
 
-  function abrirModalAssinatura(item: AutorizacaoAdministracao) {
+  async function abrirModalAssinatura(item: AutorizacaoAdministracao) {
     setModalAssinatura(item);
     setEmailAssinatura(item.proprietarios?.email ?? "");
     setErroAssinatura(null);
+    try {
+      const adm = await buscarDadosAdministradora();
+      setEmailAdministradora(adm?.adm_email ?? "");
+      setNomeAdministradora(adm?.adm_razao_social ?? "");
+    } catch {
+      setEmailAdministradora("");
+      setNomeAdministradora("");
+    }
   }
 
   async function confirmarEnviarAssinatura() {
     const item = modalAssinatura;
     if (!item) return;
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailAssinatura.trim())) {
+    const emailValido = (valor: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor.trim());
+    if (!emailValido(emailAssinatura)) {
       setErroAssinatura("Informe um e-mail válido.");
+      return;
+    }
+    if (emailAdministradora.trim() && !emailValido(emailAdministradora)) {
+      setErroAssinatura("O e-mail da imobiliária é inválido. Corrija ou deixe em branco.");
       return;
     }
     if (!item.drive_file_id) {
@@ -86,6 +107,7 @@ export function AutorizacoesListPage() {
       const pdfBase64 = await blobParaBase64(blob);
       const resultado = await enviarParaAssinatura(pdfBase64, item.drive_file_name ?? "autorizacao.pdf", [
         { nome: item.proprietarios?.nome ?? "Proprietário", email: emailAssinatura.trim() },
+        ...(emailAdministradora.trim() ? [{ nome: nomeAdministradora || "Imobiliária", email: emailAdministradora.trim() }] : []),
       ]);
       const { error } = await supabase.from("autorizacoes_administracao").update({
         assinafy_document_id: resultado.documentId,
@@ -99,6 +121,44 @@ export function AutorizacoesListPage() {
     } finally {
       setAssinaturaPendingId(null);
     }
+  }
+
+  async function salvarDocumentoGerado(conteudo: string, modelo: ModeloContrato) {
+    if (!gerar) return;
+    const { item, tipo } = gerar;
+    const numero = item.numero ?? "SEM NUMERO";
+    const ehContrato = tipo === "contrato";
+    if (ehContrato && item.drive_file_id && !window.confirm(
+      `Esta autorização já tem um arquivo anexado (${item.drive_file_name ?? "arquivo"}). Substituir pelo contrato gerado?` +
+      (item.assinafy_document_id ? "\n\nO envio para assinatura atual será desvinculado." : ""),
+    )) {
+      throw new Error("Geração cancelada: o arquivo anexado foi mantido.");
+    }
+
+    const nomeArquivo = ehContrato
+      ? `${numero.replace("/", "-")} - CONTRATO DE ADMINISTRACAO.pdf`
+      : `${numero.replace("/", "-")} - ADITIVO INCLUSAO DE IMOVEL ${todayISO()}.pdf`;
+    const blob = await gerarPdfDocumento(conteudo, { numeroContrato: numero, data: ehContrato ? item.data_inicio : todayISO(), tipoImovel: null });
+    const uploaded = await uploadDriveFile(new File([blob], nomeArquivo, { type: "application/pdf" }), {
+      category: "autorizacao",
+      folders: [item.proprietarios?.nome, numero],
+      fileName: nomeArquivo,
+    });
+
+    if (ehContrato) {
+      const { error } = await supabase.from("autorizacoes_administracao").update({
+        drive_file_id: uploaded.id, drive_file_name: uploaded.name, drive_mime_type: uploaded.mimeType, drive_file_size: Number(uploaded.size),
+        assinafy_document_id: null, assinafy_assignment_id: null, assinafy_status: null, assinafy_resumo: null,
+        observacoes: item.observacoes ?? `GERADO PELO MODELO "${modelo.nome}"`,
+      }).eq("id", item.id);
+      if (error) {
+        await deleteDriveFile(uploaded.id).catch(() => undefined);
+        throw new Error(error.message);
+      }
+      if (item.drive_file_id && item.drive_file_id !== uploaded.id) await deleteDriveFile(item.drive_file_id).catch(() => undefined);
+    }
+    downloadBlob(blob, nomeArquivo);
+    await reload();
   }
 
   async function atualizarStatusAssinatura(item: AutorizacaoAdministracao) {
@@ -159,12 +219,27 @@ export function AutorizacoesListPage() {
             </div>
           )}
         </Td>
-        <Td><div className="flex gap-2">{canWrite && <Button variant="secondary" onClick={() => setEditing(item)}><Pencil size={15} /></Button>}{papel === "admin" && <Button variant="danger" onClick={() => remove(item)}><Trash2 size={15} /></Button>}</div></Td>
+        <Td><div className="flex gap-2">{canWrite && <>
+          <Button variant="secondary" onClick={() => setGerar({ item, tipo: "contrato" })} title="Gerar contrato de administração pelo modelo"><FileText size={15} /></Button>
+          <Button variant="secondary" onClick={() => setGerar({ item, tipo: "aditivo" })} title="Gerar aditivo de inclusão de imóvel"><FilePlus2 size={15} /></Button>
+        </>}{canWrite && <Button variant="secondary" onClick={() => setEditing(item)} title="Editar"><Pencil size={15} /></Button>}{papel === "admin" && <Button variant="danger" onClick={() => remove(item)}><Trash2 size={15} /></Button>}</div></Td>
       </tr>)}</tbody>
     </Table>}</Card>
     <Modal open={editing !== undefined} title={editing ? "Editar autorização" : "Nova autorização"} onClose={() => setEditing(undefined)}>
       <AuthorizationForm value={editing ?? undefined} owners={owners} properties={properties} onSaved={async () => { setEditing(undefined); await reload(); }} />
     </Modal>
+    <GerarDocumentoModal
+      open={gerar !== null}
+      titulo={gerar?.tipo === "aditivo" ? `Aditivo de inclusão de imóvel — ${gerar.item.numero ?? ""}` : `Contrato de administração — ${gerar?.item.numero ?? ""}`}
+      aviso={gerar?.tipo === "aditivo"
+        ? <>Antes de gerar, edite a autorização e marque o imóvel novo. O aditivo lista <b>todos</b> os imóveis marcados. O PDF é salvo no Drive, na pasta desta autorização, e baixado; o arquivo do contrato anexado não muda.</>
+        : <>Usa o proprietário, os imóveis marcados, o número e a data desta autorização e a taxa do cadastro do proprietário. O PDF gerado fica anexado à autorização, pronto para enviar para assinatura.</>}
+      carregarModelos={() => buscarModelosAtivos(gerar?.tipo === "aditivo" ? "aditivo_administracao" : "contrato_administracao", "administracao")}
+      resolver={(conteudoModelo) => resolverContratoAdministracao(gerar!.item, conteudoModelo)}
+      rotuloSalvar={gerar?.tipo === "aditivo" ? "Salvar aditivo (PDF no Drive)" : "Salvar e anexar à autorização"}
+      onSalvar={salvarDocumentoGerado}
+      onClose={() => setGerar(null)}
+    />
     <Modal open={modalAssinatura !== null} title="Enviar para assinatura" onClose={() => setModalAssinatura(null)}>
       <div className="space-y-4">
         <p className="text-sm text-slate-500">
@@ -172,6 +247,9 @@ export function AutorizacoesListPage() {
         </p>
         <Field label={`Proprietário — ${modalAssinatura?.proprietarios?.nome ?? ""}`} htmlFor="email_assinatura_autorizacao">
           <Input id="email_assinatura_autorizacao" type="email" value={emailAssinatura} onChange={(e) => setEmailAssinatura(e.target.value)} placeholder="email@exemplo.com" />
+        </Field>
+        <Field label={`Imobiliária${nomeAdministradora ? ` — ${nomeAdministradora}` : ""} (deixe em branco se não for assinar digitalmente)`} htmlFor="email_assinatura_administradora">
+          <Input id="email_assinatura_administradora" type="email" value={emailAdministradora} onChange={(e) => setEmailAdministradora(e.target.value)} placeholder="email@imobiliaria.com.br" />
         </Field>
         {erroAssinatura && <ErrorState message={erroAssinatura} />}
         <div className="flex justify-end gap-2">
